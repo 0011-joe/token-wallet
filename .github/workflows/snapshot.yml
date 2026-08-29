@@ -26,4 +26,8 @@ jobs:
             echo "::error::APP_URL variable 未配置，请在仓库 Settings > Variables 添加"
             exit 1
           fi
+          # 清理粘贴配置时可能带入的首尾空白/换行（GitHub 表单常见问题，
+          # 否则 curl 报 "Malformed input to a URL function"）
+          CRON_SECRET="$(printf '%s' "$CRON_SECRET" | xargs)"
+          APP_URL="$(printf '%s' "$APP_URL" | xargs)"
           curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/snapshot"
