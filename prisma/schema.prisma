@@ -1,0 +1,142 @@
+// DeepBalance Prisma schema (T0.2)
+// 本地路线：SQLite；金额用 Float（上线切 Postgres 时改 Decimal 并迁移）
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ── Auth.js 模型 ──
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  keys          ApiKey[]
+  alerts        AlertSetting?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── 业务模型（计划 §5，金额字段 SQLite 用 Float）──
+
+// API Key：AES-256-GCM 密文落库，只暴露 last4（规格卡 A）
+model ApiKey {
+  id         String   @id @default(cuid())
+  userId     String
+  label      String // 用户备注名
+  ciphertext Bytes // AES-256-GCM 密文
+  iv         Bytes
+  authTag    Bytes
+  last4      String // 仅存 sk- 后 4 位用于展示
+  isActive   Boolean  @default(true)
+  failCount  Int      @default(0) // 连续失败次数
+  lastStatus String? // OK | INVALID | RATE_LIMITED | ERROR
+  createdAt  DateTime @default(now())
+  snapshots  BalanceSnapshot[]
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, last4])
+}
+
+model BalanceSnapshot {
+  id              String   @id @default(cuid())
+  apiKeyId        String
+  fetchedAt       DateTime
+  currency        String // CNY | USD，分币种不混算
+  totalBalance    Float
+  grantedBalance  Float
+  toppedUpBalance Float
+  isAvailable     Boolean
+  ok              Boolean  @default(true) // 本次拉取是否成功
+  apiKey          ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, fetchedAt])
+}
+
+model UsageImport {
+  id         String       @id @default(cuid())
+  userId     String
+  month      String // YYYY-MM，幂等键
+  fileName   String
+  importedAt DateTime     @default(now())
+  currency   String? // 来自 cost CSV（CNY | USD 等），null=未导入 cost 文件
+  rows       ModelUsage[]
+
+  @@unique([userId, month])
+}
+
+// 按 M1 探针（Q1 真实样本）定型：官方 CSV 是 type×price 长表（峰谷各一档价格），
+// 一行 = 模型×Key×type×单价 的聚合；计划草案的宽表列（prompt/completion/cached）由 type 字段表达
+model ModelUsage {
+  id        String     @id @default(cuid())
+  importId  String
+  model     String
+  apiKeyRef String? // CSV 内分 Key 标识（官方已打码）
+  type      String // input_cache_hit_tokens | input_cache_miss_tokens | output_tokens | request_count
+  unitPrice Float? // 每 token 单价；request_count 无价格
+  amount    Int // token 数或请求次数
+  cost      Float // price×amount 合计；request_count 为 0
+  import    UsageImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId])
+}
+
+model AlertSetting {
+  userId              String @id
+  lowBalanceThreshold Float  @default(20)
+  failThresholdN      Int    @default(3)
+  emailEnabled        Boolean @default(true)
+  inappEnabled        Boolean @default(true)
+  user                User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AlertEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  apiKeyId  String
+  type      String // LOW_BALANCE | UNAVAILABLE | KEY_FAILED
+  message   String
+  dedupKey  String // 频控去重键
+  createdAt DateTime @default(now())
+
+  @@unique([dedupKey, createdAt])
+}

@@ -1,0 +1,8 @@
+﻿user_id,start_time_iso,end_time_iso,model,api_key_name,api_key,type,price,amount
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,input_cache_hit_tokens,0.00000005,14242048
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,input_cache_hit_tokens,0.0000001,126464
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,input_cache_miss_tokens,0.0000015,576617
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,input_cache_miss_tokens,0.000003,76863
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,request_count,,302
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,output_tokens,0.0000045,212625
+26f44958-e530-4ebc-9308-61fe1ee286dd,2026-08-28T00:00:00+08:00,2026-08-29T00:00:00+08:00,deepseek-v4-flash-vision-exp,铠,sk-dbad1***********************d8d7,output_tokens,0.000009,4735

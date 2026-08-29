@@ -1,0 +1,182 @@
+{
+  "finishedAt": "2026-08-28T22:50:48.075Z",
+  "email": "qa-visual@example.com",
+  "keyALast4": "d8d7",
+  "results": [
+    {
+      "id": "T1",
+      "name": "未登录访问受保护页 307 -> /login",
+      "pass": true,
+      "note": "/dashboard -> 307 /login; /keys -> 307 /login; /settings -> 307 /login",
+      "shot": null
+    },
+    {
+      "id": "T2a",
+      "name": "魔法链接生成（服务端日志提取）",
+      "pass": true,
+      "note": "host=localhost:3000",
+      "shot": null
+    },
+    {
+      "id": "T2b",
+      "name": "魔法链接回调后落地页",
+      "pass": true,
+      "note": "landed=/login",
+      "shot": null
+    },
+    {
+      "id": "T2c",
+      "name": "登录链路：会话建立并渲染 /dashboard",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T3a",
+      "name": "非法 Key 格式前端即时拦截提示",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T3b",
+      "name": "真实 Key 导入（sk-…d8d7）",
+      "pass": true,
+      "note": "重复运行：表单跳过，Key 已存在（id=cmtdj7mqj0001v0toc7hxna47）",
+      "shot": null
+    },
+    {
+      "id": "T4a",
+      "name": "seed.js 造数（Key A 快照/缺口/不可用/充值/USD + Key B/待删 Key + 3 条预警事件）",
+      "pass": true,
+      "note": "snapshots=24 keyA=ok(d8d7)",
+      "shot": null
+    },
+    {
+      "id": "T4b",
+      "name": "Key A 存在性",
+      "pass": true,
+      "note": "keyA.id=cmtdj7mqj0001v0toc7hxna47... keyA.last4=d8d7",
+      "shot": null
+    },
+    {
+      "id": "T5a",
+      "name": "四卡渲染与数值（余额=最新快照、今日/本月估算、状态卡、估算标识 x3）",
+      "pass": true,
+      "note": "balance=¥1,281.50 today=¥0.55 month=¥26.60",
+      "shot": null
+    },
+    {
+      "id": "T5b",
+      "name": "估算标识→口径说明弹层开关",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T5c-30d",
+      "name": "趋势30天：缺口日瑘珀点+图例",
+      "pass": true,
+      "note": "amber=2 ticks=15",
+      "shot": null
+    },
+    {
+      "id": "T5c-switch",
+      "name": "趋势 7/30/90 切换图表重绘",
+      "pass": true,
+      "note": "ticks 30=15 90=17 7=12",
+      "shot": null
+    },
+    {
+      "id": "T5d",
+      "name": "余额构成环形图（赠金/充值）",
+      "pass": true,
+      "note": "sectors=2",
+      "shot": null
+    },
+    {
+      "id": "T5e",
+      "name": "Key 切换下拉（切到不可用 Key）",
+      "pass": true,
+      "note": "options=4",
+      "shot": null
+    },
+    {
+      "id": "T5f-empty",
+      "name": "分模型空态引导（三步+官方链接）",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T5f-cost",
+      "name": "cost 文件上传→错误提示",
+      "pass": true,
+      "note": "err=[\"请选择官方用量 amount CSV；cost 文件需与 amount 文件一起\"]",
+      "shot": null
+    },
+    {
+      "id": "T5f-import",
+      "name": "amount+cost 上传→占比行+币种 CNY",
+      "pass": true,
+      "note": "2026-08 共 1 个模型",
+      "shot": null
+    },
+    {
+      "id": "T5f-detail",
+      "name": "模型占比行 byType 详明展开",
+      "pass": true,
+      "note": "rows=7",
+      "shot": null
+    },
+    {
+      "id": "T6",
+      "name": "响应式 375×812 卡片纵向堆叠 / 1024平面正常",
+      "pass": true,
+      "note": "mobile card w=343 stacked=true",
+      "shot": null
+    },
+    {
+      "id": "T7a",
+      "name": "Key 列表：last4 掩码 sk-••••xxxx + 状态文字「正常」",
+      "pass": true,
+      "note": "正常×3",
+      "shot": null
+    },
+    {
+      "id": "T7b",
+      "name": "Switch 启停（aria-checked true→false→true，带「已停用」标签反馈）",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T7c",
+      "name": "删除流程（confirm 取消=保留/确认=删除）",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T8a",
+      "name": "设置页布局与默认值/事件列表/登出注销存在（未点击）",
+      "pass": true,
+      "note": "",
+      "shot": null
+    },
+    {
+      "id": "T8b",
+      "name": "预警设置修改→保存→reload 值保留（PUT/GET /api/alerts）",
+      "pass": true,
+      "note": "55/5/emailOff 已持久化",
+      "shot": null
+    },
+    {
+      "id": "T8c",
+      "name": "恢复默认值（20/3/勾选）",
+      "pass": true,
+      "note": "",
+      "shot": null
+    }
+  ]
+}
