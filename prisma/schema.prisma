@@ -1,11 +1,12 @@
-// DeepBalance Prisma schema (T0.2)
-// 本地路线：SQLite；金额用 Float（上线切 Postgres 时改 Decimal 并迁移）
+// DeepBalance Prisma schema
+// 数据库：云 Postgres（Neon）；金额用 Float（float8 精度足够个人工具；
+// 若改 Decimal 需同步改造 JSON 序列化——Prisma Decimal 会序列化为字符串）
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ── Auth.js 模型 ──

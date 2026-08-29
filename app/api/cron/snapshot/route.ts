@@ -66,7 +66,11 @@ async function handleCron(request: Request): Promise<NextResponse> {
       { status: 503 }
     );
   }
-  const provided = request.headers.get("x-cron-secret") ?? "";
+  // 兼容两种鉴权头：项目自定义 x-cron-secret（GitHub Actions/cron-job 等
+  // 外部调度），以及 Vercel Cron 官方约定 Authorization: Bearer <CRON_SECRET>
+  const provided =
+    request.headers.get("x-cron-secret") ??
+    (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!secretMatches(provided, cronSecret)) {
     return NextResponse.json(
       { ok: false, error: "鉴权失败：x-cron-secret 不匹配" },

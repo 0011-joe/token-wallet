@@ -1,0 +1,29 @@
+# 每小时余额快照：调用部署环境的 /api/cron/snapshot
+# 前置配置（GitHub 仓库 Settings）：
+#   - Actions secrets: CRON_SECRET（与 Vercel 环境变量同名同值）
+#   - Actions variables: APP_URL（如 https://deepbalance.vercel.app）
+name: hourly-snapshot
+
+on:
+  schedule:
+    - cron: "13 * * * *" # 每小时第 13 分（避开整点）
+  workflow_dispatch: {}
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger snapshot endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET secret 未配置，请在仓库 Settings > Secrets 添加"
+            exit 1
+          fi
+          if [ -z "$APP_URL" ]; then
+            echo "::error::APP_URL variable 未配置，请在仓库 Settings > Variables 添加"
+            exit 1
+          fi
+          curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/snapshot"

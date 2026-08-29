@@ -5,7 +5,7 @@
  * - AlertEvent / UsageImport 没有 User 关系（模型里只有 userId 字段、无 relation），
  *   Prisma onDelete: Cascade 对它们不触发，必须手动 deleteMany；
  * - ApiKey / BalanceSnapshot / AlertSetting / Account / Session 由 onDelete: Cascade
- *   随 User 自动删除（better-sqlite3 adapter 下实测：user.delete 后三者计数均为 0）；
+ *   随 User 自动删除（Postgres 下实测：user.delete 后三者计数均为 0）；
  * - VerificationToken 无 relation（按 email 的临时魔法链接令牌，随过期自然失效，非用户数据）。
  *
  * 「注销后不再被定时任务调用」（AC6-2 后半）：cron（GET/POST /api/cron/snapshot）遍历

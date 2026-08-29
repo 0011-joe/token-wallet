@@ -1,5 +1,5 @@
 /**
- * M6 / T6.3 alerts 路由集成测试：mock next-auth 会话，走真实 SQLite（dev.db），
+ * M6 / T6.3 alerts 路由集成测试：mock next-auth 会话，走真实 Postgres 测试库，
  * 验证：PUT 阈值非负校验（AC5：阈值不允许为负）、部分字段更新 upsert 保留其余字段、
  * GET 返回设置 + 事件列表（severity 为后端派生字段）。
  */
