@@ -61,7 +61,7 @@ export function BalanceCard({
   return (
     <Card
       className={cn(
-        "relative overflow-hidden border-white/10 bg-gradient-to-b from-sky-500/10 via-card to-indigo-500/15 shadow-lg backdrop-blur-xl dark:from-sky-400/15 dark:via-card/60 dark:to-indigo-500/20",
+        "relative overflow-hidden border-white/10 bg-gradient-to-b from-sky-500/10 via-card/80 to-indigo-500/15 shadow-lg backdrop-blur-xl dark:from-sky-400/15 dark:via-card/60 dark:to-indigo-500/20",
         unavailable && "from-rose-500/10 to-rose-500/15 ring-1 ring-destructive/40"
       )}
       aria-invalid={unavailable || undefined}
