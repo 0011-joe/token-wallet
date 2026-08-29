@@ -140,6 +140,7 @@ function Dashboard({
   return (
     <div className="flex flex-col gap-4">
       {/* 第一行：四张等宽卡片（移动端纵向堆叠） */}
+      {/* 第一屏：余额主卡（含当日/本月消耗）+ 趋势图 */}
       <div data-testid="card-balance" className="grid gap-4">
         <BalanceCard
           balance={data.balance}
@@ -148,22 +149,22 @@ function Dashboard({
           keyId={data.key.id}
           keyLabel={data.key.label}
         />
-      </div>
-
-      {/* 第二行：趋势图（左，2/3）+ 余额构成（右，1/3） */}
-      <div className="grid gap-4 lg:grid-cols-3">
         <TrendCard
           days={data.trend.days}
           range={range}
           currency={currency}
           onRangeChange={onRangeChange}
-          className="lg:col-span-2"
+          className="w-full"
         />
-        <BalanceComposition balance={data.balance} />
       </div>
 
-      {/* 第三行：分模型 Token 用量（可选 CSV 导入，不影响主看板） */}
-      <ModelUsage />
+      {/* 第二屏：余额构成（右 1/3）+ 分模型 Token 用量（左 2/3） */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ModelUsage />
+        </div>
+        <BalanceComposition balance={data.balance} />
+      </div>
     </div>
   );
 }

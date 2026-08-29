@@ -334,7 +334,7 @@ async function main() {
     try {
       await page.goto(BASE + "/dashboard?keyId=" + seed.keyA.id, { waitUntil: "networkidle" });
       await expectText(page, "\u8d26\u6237\u603b\u4f59\u989d", 20000);
-      await expectText(page, "\u4eca\u65e5\u6d88\u8017", 10000);
+      await expectText(page, "\u5f53\u65e5\u6d88\u8017", 10000);
       await expectText(page, "\u672c\u6708\u6d88\u8017", 10000);
       await expectText(page, "\u8d26\u6237\u72b6\u6001", 10000);
       const bal = seed.latestBalance;
@@ -343,14 +343,14 @@ async function main() {
         ["\u4f59\u989d\u4e3b\u6570\u5b57", money(bal.total)],
         ["\u8d60\u91d1", "\u8d60\u91d1 " + money(bal.granted)],
         ["\u5145\u503c", "\u5145\u503c " + money(bal.toppedUp)],
-        ["\u4eca\u65e5\u6d88\u8017\u91d1\u989d", money(seed.todayCost)],
+        ["\u5f53\u65e5\u6d88\u8017", money(seed.todayCost)],
         ["\u672c\u6708\u6d88\u8017\u91d1\u989d", money(seed.monthCost)],
         ["\u4f30\u7b97\u53e3\u5f84\u8bf4\u660e", "\u7531\u4f59\u989d\u5feb\u7167\u5dee\u503c\u4f30\u7b97"],
       ];
       const bad = [];
       for (const e of expects) if (!cardText.includes(e[1])) bad.push(e[0] + "\u7f3a" + e[1]);
       const badgeCount = await page.getByRole("button", { name: "\u67e5\u770b\u4f30\u7b97\u53e3\u5f84\u8bf4\u660e" }).count();
-      if (badgeCount !== 3) bad.push("\u4f30\u7b97\u6807\u8bc6\u6570=" + badgeCount + "\uff08\u671f\u671b3\uff09");
+      if (badgeCount !== 2) bad.push("\u4f30\u7b97\u6807\u8bc6\u6570=" + badgeCount + "\uff08\u671f\u671b2\uff09");
       if (!cardText.includes("\u53ef\u8c03\u7528")) bad.push("\u72b6\u6001\u5361\u7f3a\u300c\u53ef\u8c03\u7528\u300d");
       if (!cardText.includes("\u4f59\u989d\u6784\u6210")) bad.push("\u7f3a\u300c\u4f59\u989d\u6784\u6210\u300d\u5361");
       const pctGranted = ((bal.granted / bal.total) * 100).toFixed(1);

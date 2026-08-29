@@ -215,7 +215,10 @@ function SubUsageCard({
 }) {
   const noBaseline = cost.from === "no-snapshot";
   return (
-    <div className="rounded-xl border border-white/10 bg-card/50 p-3 backdrop-blur-sm dark:bg-white/5">
+    <div
+      data-testid={title === "当日消耗" ? "card-today" : "card-month"}
+      className="rounded-xl border border-white/10 bg-card/50 p-3 backdrop-blur-sm dark:bg-white/5"
+    >
       <div className="flex items-center justify-between gap-1.5">
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {icon}
