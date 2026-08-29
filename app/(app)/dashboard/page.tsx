@@ -9,8 +9,6 @@ import { CircleAlert, KeyRound, RefreshCw } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BalanceCard } from "@/components/dashboard/balance-card";
-import { MetricCard } from "@/components/dashboard/metric-card";
-import { StatusCard } from "@/components/dashboard/status-card";
 import { TrendCard, type RangeValue } from "@/components/dashboard/trend-chart";
 import { BalanceComposition } from "@/components/dashboard/balance-composition";
 import { ModelUsage } from "@/components/dashboard/model-usage";
@@ -142,19 +140,14 @@ function Dashboard({
   return (
     <div className="flex flex-col gap-4">
       {/* 第一行：四张等宽卡片（移动端纵向堆叠） */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div data-testid="card-balance">
-          <BalanceCard balance={data.balance} keyId={data.key.id} />
-        </div>
-        <div data-testid="card-today">
-          <MetricCard title="今日消耗" cost={data.today} />
-        </div>
-        <div data-testid="card-month">
-          <MetricCard title="本月消耗" cost={data.month} />
-        </div>
-        <div data-testid="card-status">
-          <StatusCard apiKey={data.key} balance={data.balance} />
-        </div>
+      <div data-testid="card-balance" className="grid gap-4">
+        <BalanceCard
+          balance={data.balance}
+          today={data.today}
+          month={data.month}
+          keyId={data.key.id}
+          keyLabel={data.key.label}
+        />
       </div>
 
       {/* 第二行：趋势图（左，2/3）+ 余额构成（右，1/3） */}
