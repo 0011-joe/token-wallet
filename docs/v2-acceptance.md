@@ -1,6 +1,6 @@
 # token-wallet v2.0 验收记录（M8 / T8.1）
 
-> 记录时间：2026-09-10 · 基线：DeepBalance v1（tag `v1.0.0`）
+> 记录时间：2026-09-10（v2 全量回归）· 生产迁移与上线：2026-09-11 · 基线：DeepBalance v1（tag `v1.0.0`）
 > 执行方式：本地全量回归（`npm test` / `npm run typecheck` / `npm run lint` / `npm run build`）
 
 ## 1. 全量回归结果
@@ -75,14 +75,35 @@
 | --- | --- |
 | AC6.1 全新 Vercel/Neon 账号 30 分钟跑通 | 需用户账号实测（README 已给出逐步路径） |
 | T0.5 火山签名真实 spike（go/no-go） | 需真实「费用中心只读 IAM 子用户」AK/SK：`VOLC_AK=... VOLC_SK=... npx tsx scripts/spike-volc-sig.ts`（签名已通过官方向量 4 组逐字节对拍） |
-| T8.2/T8.3 生产库迁移与灰度 | 需在生产执行：备份 → `npx tsx scripts/migrate-v1-to-v2.ts` → 对账 → 观察 → `--drop-legacy` |
+| T8.2 灰度与双读比对 | 未做：单用户规模直接全量切换，未跑双读比对与视觉回归重截（见 §4） |
+| T8.3 剩余步骤 | 生产迁移与切读已完成（见 §4），剩「观察一个版本周期 → `npx tsx scripts/migrate-v1-to-v2.ts --drop-legacy`」 |
 
 ## 3. 迁移演练（T8.2，测试库）
 
 `tests/migration.test.ts` 在测试库完整演练并全部通过：
 - 备份导出（含密文 base64）→ 事务内搬数 → 对账（行数相等、按币种金额合计误差 0）→ 失败场景事务回滚（Credential 不残留）→ `dropLegacyTables` 幂等。
 
-## 4. 已知项
+## 4. 生产迁移与上线（T8.3，2026-09-11）
+
+生产库 Neon `neondb`；库内与部署时间戳均为 UTC。
+
+| 步骤 | 结果 | 证据 |
+| --- | --- | --- |
+| 备份 | ✅ 6 份 JSON 快照（各 `apiKeys=1 / snapshots=103`） | `.backups/v1-backup-*.json` |
+| `prisma migrate deploy` | ✅ `20260910142500_v2_multi_provider` 已应用 | `_prisma_migrations` finished `2026-09-10T16:03:47Z`；表已改名 `ApiKey→ApiKeyLegacy`、`BalanceSnapshot→BalanceSnapshotLegacy` |
+| 搬数 + 对账 | ✅ `credentials=1 / snapshots=103 / alertEventsRemapped=11` | `rowsEqual`、`amountDiffZero`、`usageProviderAllDeepseek` 均 true；CNY `1391.229999999999 → 1391.230000000`；`ciphertext`/`iv`/`authTag` 逐字节一致；AlertEvent 悬空引用 0 |
+| 切读（部署 v2） | ✅ 部署 `96dc694` READY（48s） | `/` 标题 `DeepBalance → token-wallet`；`/api/health` 由 404 → 200 且 `providers.deepseek.credentialCount=1` |
+| 观察一个版本周期 | ⏳ 待办 | 基线：快照 103 条、最新 `2026-09-10T14:37:50Z`（改表前每小时取数正常，后因改表中断） |
+| `--drop-legacy` | ⏳ 待办 | `ApiKeyLegacy` / `BalanceSnapshotLegacy` 仍在 |
+
+执行中修掉的两个阻塞（均已推送并复验）：
+
+1. `173b7aa` 迁移脚本事务超时 5s → 120s。远端库 104 次串行 INSERT 超出 Prisma 默认交互式事务超时，首次执行于 5.1s 触发回滚 —— **回滚干净**（`Credential=0`、旧表行数不变），生产回滚预案在这一步得到真实验证。
+2. `96dc694` `.npmrc` 关闭 peer 强校验。`next-auth@4.24.15` 的 `peerOptional nodemailer@"^7.0.7"` 与根项目 `nodemailer@^9` 冲突，npm 7+ 直接 ERESOLVE → **生产部署自 2026-09-10 起 5 次全部 ERROR，生产因此一直卡在 2026-08-29 的 v1 构建**（排查路径见 `docs/deployment.md` §4.6 与 §5 排障表）。
+
+遗留：切读后 `Credential.lastSuccessAt` 仍为 NULL（v1 旧表无此列），`/api/health` 显示 `staleCount=1`，待下一次整点 cron 取数后归零。
+
+## 5. 已知项
 
 1. 生产依赖中 4 项 `high` 来自 **prisma CLI 的 devDependency 链**（`@prisma/config`/`deepmerge-ts`/`mysql2`/`prisma`），仅在开发/迁移时运行，不进应用运行时；修复需 prisma 降到 6.x（major 回退），已记录为已知项。
 2. NextAuth v4 长期兼容 → 升级 v5 属 ROADMAP B2（v2.0 明确不做）；`build` 与全部路由验证无阻断。

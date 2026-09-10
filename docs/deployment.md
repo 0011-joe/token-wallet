@@ -1,4 +1,4 @@
-# token-wallet 部署与运维手册（2026-08-29 上线）
+# token-wallet 部署与运维手册（v1 上线 2026-08-29 · v2 多平台版上线 2026-09-11）
 
 > 本文档记录生产环境全貌：架构、入口、凭证位置、日常操作、排障。
 > **安全红线：本文档不含任何密钥值**——凭证只标注"放在哪"；密钥本体存密码管理器 / Vercel 控制台。
@@ -75,6 +75,22 @@ npx prisma migrate deploy（测试库同理换 TEST_DATABASE_URL）
 - 每小时 13 分：GitHub Actions `hourly-snapshot`（需要仓库 Secrets `CRON_SECRET` + Variables `APP_URL`）
 - 每天 06:14 UTC：Vercel Cron（`vercel.json`，请求头自动带 `Authorization: Bearer $CRON_SECRET`）
 
+### 4.6 依赖安装的硬约束（勿删 `.npmrc`）
+`next-auth@4.24.15` 声明 `peerOptional nodemailer@"^7.0.7"`，而本项目直接依赖 `nodemailer@^9`（`lib/email/mailer.ts` 自行 `createTransport`，`auth.ts` 用自定义 `sendVerificationRequest`，next-auth 内置的 nodemailer 通路从未被使用）。npm 7+ 会因此 ERESOLVE 直接失败，表现为 Vercel 构建挂在 `npm install`（`errorCode=module_not_found`、`"npm install" exited with 1`）。仓库根 `.npmrc` 的 `legacy-peer-deps=true` 就是为此而加，**删掉它构建立刻变红**。
+另注：Vercel 项目 `nodeVersion` 为 `24.x`，CI（`.github/workflows/ci.yml`）与本机为 `22.x`，两者不同。
+
+### 4.7 数据迁移（v1 → v2，已完成）
+
+```bash
+npx tsx scripts/migrate-v1-to-v2.ts                 # 备份 → 事务内搬数 + 对账（对账不过即整体回滚）
+npx tsx scripts/migrate-v1-to-v2.ts --backup-only   # 只备份
+npx tsx scripts/migrate-v1-to-v2.ts --drop-legacy   # 观察一个版本周期后删旧表
+```
+
+- 脚本自加载 `.env.local` 的 `DATABASE_URL`，**执行前务必确认它打印的目标 host** 是生产库；
+- 2026-09-11 已在生产执行完毕（`Credential=1`、`BalanceSnapshot=103`、对账误差 0）。旧表 `ApiKeyLegacy`/`BalanceSnapshotLegacy` 暂留，观察期结束后再跑 `--drop-legacy`；
+- 远端库上 100+ 次串行 INSERT 会超过 Prisma 默认 5s 交互式事务超时，脚本内已设 `timeout=120s`。
+
 ## 5. 常见故障排查
 
 | 现象 | 排查 |
@@ -85,6 +101,8 @@ npx prisma migrate deploy（测试库同理换 TEST_DATABASE_URL）
 | 快照没数据 | GitHub Actions 该 cron 运行日志；或手动 curl 4.3；看 Vercel 函数日志 |
 | 页面冷启动慢（3~10s） | 免费档函数休眠，正常现象，可用后即秒开 |
 | 本地 `npm run dev` 起不来 | 检查 `.env.local` 的 `DATABASE_URL`/`TEST_DATABASE_URL`（勿用 `file:` 开头） |
+| 改了代码但生产没变 | 先看 Vercel → Deployments：**部署创建了但状态 ERROR 时，生产会静默继续服务上一个成功构建**，极易误判成"自动部署没触发"。点进 build 日志看具体报错（本例即 4.6 的 `npm install` ERESOLVE） |
+| 本机 cron 端点返回 401 | `.env.local` 的 `CRON_SECRET` 与 Vercel 生产值可能不同（该变量在 Vercel 侧为 sensitive，不可导出查看）；以 GitHub Actions 里那份为准 |
 
 ## 6. 安全与备份清单
 
