@@ -39,7 +39,11 @@ async function main(): Promise<void> {
 
   // 2) 事务内搬数 + 对账
   try {
-    const report = await db.$transaction(async (tx) => migrateLegacyData(tx));
+    // 远端库（Neon 等）上 100+ 次串行 INSERT 会超过 Prisma 默认的 5s 交互式事务超时——放宽到 120s。
+    const report = await db.$transaction(async (tx) => migrateLegacyData(tx), {
+      timeout: 120_000,
+      maxWait: 30_000,
+    });
     console.log(
       `[migrate] 迁移完成 migrated=${JSON.stringify(report.migrated)} reconciliation=${JSON.stringify(report.reconciliation)}`
     );
