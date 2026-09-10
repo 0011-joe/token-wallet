@@ -15,11 +15,12 @@ import {
 
 const KEY = {
   id: "key-1",
-  last4: "d8d7",
+  provider: "deepseek" as const,
+  hint: "d8d7",
   failCount: 0,
   lastStatus: null as string | null,
 };
-const SETTINGS = { lowBalanceThreshold: 20, failThresholdN: 3 };
+const SETTINGS = { lowBalanceThreshold: "20.000000000", failThresholdN: 3 };
 
 function hoursAgo(h: number): Date {
   return new Date(Date.now() - h * 3600_000);
@@ -35,11 +36,11 @@ function evaluate(overrides: Partial<Parameters<typeof evaluateAlerts>[0]> = {})
   });
 }
 
-const snap = (
-  totalBalance: number,
-  isAvailable = true,
-  currency = "CNY"
-) => ({ totalBalance, isAvailable, currency });
+const snap = (available: number | string, isAvailable = true, currency = "CNY") => ({
+  available: typeof available === "number" ? available.toFixed(6) : available,
+  isAvailable,
+  currency,
+});
 
 describe("LOW_BALANCE（AC5-1：跌破阈值 → 预警）", () => {
   it("余额 < 阈值 → 生成 LOW_BALANCE（warning / 正确的 dedupKey / 掩码 last4）", () => {
@@ -49,12 +50,12 @@ describe("LOW_BALANCE（AC5-1：跌破阈值 → 预警）", () => {
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       type: "LOW_BALANCE",
-      apiKeyId: "key-1",
+      credentialId: "key-1",
       dedupKey: "LOW_BALANCE:key-1",
       severity: "warning",
     });
-    expect(results[0].message).toContain("sk-****d8d7");
-    expect(results[0].message).toContain("19.9CNY");
+    expect(results[0].message).toContain("****d8d7");
+    expect(results[0].message).toContain("19.900000CNY");
   });
 
   it("余额恰好等于阈值 → 不生成（要求严格小于）", () => {
@@ -68,14 +69,38 @@ describe("LOW_BALANCE（AC5-1：跌破阈值 → 预警）", () => {
   it("阈值为 0 且余额为 0 → 不生成（0 < 0 不成立）", () => {
     expect(
       evaluate({
-        settings: { ...SETTINGS, lowBalanceThreshold: 0 },
+        settings: { ...SETTINGS, lowBalanceThreshold: "0.000000000" },
         latestSnapshot: snap(0),
       })
     ).toEqual([]);
   });
 
-  it("无最新快照 → 不生成（首次失败等场景由 KEY_FAILED 覆盖）", () => {
+  it("无最新快照 → 不生成（首次失败等场景由 CREDENTIAL_FAILED 覆盖）", () => {
     expect(evaluate({ latestSnapshot: null })).toEqual([]);
+  });
+});
+
+describe("ARREARS（AC5.1：欠费 → critical 预警）", () => {
+  it("breakdown.arrears>0 → 生成 ARREARS（critical）", () => {
+    const results = evaluate({
+      latestSnapshot: { available: "50.000000000", isAvailable: true, currency: "CNY", breakdown: { arrears: "5.000000000" } },
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      type: "ARREARS",
+      credentialId: "key-1",
+      dedupKey: "ARREARS:key-1",
+      severity: "critical",
+    });
+  });
+
+  it("无 arrears 或 arrears<=0 → 不生成", () => {
+    expect(evaluate({ latestSnapshot: { available: "50.000000000", isAvailable: true, currency: "CNY" } })).toEqual([]);
+    expect(
+      evaluate({
+        latestSnapshot: { available: "50.000000000", isAvailable: true, currency: "CNY", breakdown: { arrears: "0.000000000" } },
+      })
+    ).toEqual([]);
   });
 });
 
@@ -121,15 +146,15 @@ describe("UNAVAILABLE（AC5-2：is_available 翻转 → 立即高级别预警）
   });
 });
 
-describe("KEY_FAILED（连续失败达 N 次 → 提醒检查 Key）", () => {
-  it("failCount>=N 且 lastStatus=INVALID → 生成 KEY_FAILED（warning）", () => {
+describe("CREDENTIAL_FAILED（连续失败达 N 次 → 提醒检查 Key）", () => {
+  it("failCount>=N 且 lastStatus=INVALID → 生成 CREDENTIAL_FAILED（warning）", () => {
     const results = evaluate({
       key: { ...KEY, failCount: 3, lastStatus: "INVALID" },
     });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
-      type: "KEY_FAILED",
-      dedupKey: "KEY_FAILED:key-1",
+      type: "CREDENTIAL_FAILED",
+      dedupKey: "CREDENTIAL_FAILED:key-1",
       severity: "warning",
     });
     expect(results[0].message).toContain("3 次");
@@ -194,10 +219,10 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
     expect(results[0].type).toBe("LOW_BALANCE");
   });
 
-  it("不同类型的不算频控：近期 KEY_FAILED 不抑制 LOW_BALANCE", () => {
+  it("不同类型的不算频控：近期 CREDENTIAL_FAILED 不抑制 LOW_BALANCE", () => {
     const results = evaluate({
       latestSnapshot: snap(10),
-      lastAlert: { type: "KEY_FAILED", createdAt: hoursAgo(1) },
+      lastAlert: { type: "CREDENTIAL_FAILED", createdAt: hoursAgo(1) },
     });
     expect(results).toHaveLength(1);
     expect(results[0].type).toBe("LOW_BALANCE");
@@ -213,11 +238,11 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
     ).toEqual([]);
   });
 
-  it("KEY_FAILED 频控：24h 内同类不重复", () => {
+  it("CREDENTIAL_FAILED 频控：24h 内同类不重复", () => {
     expect(
       evaluate({
         key: { ...KEY, failCount: 5, lastStatus: "INVALID" },
-        lastAlert: { type: "KEY_FAILED", createdAt: hoursAgo(12) },
+        lastAlert: { type: "CREDENTIAL_FAILED", createdAt: hoursAgo(12) },
       })
     ).toEqual([]);
   });
@@ -226,9 +251,9 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
 describe("导出常量与多类型同时命中", () => {
   it("频控窗口为 24h；默认阈值 20 / 默认 N=3", () => {
     expect(FREQUENCY_WINDOW_MS).toBe(24 * 3600_000);
-    expect(DEFAULT_LOW_BALANCE_THRESHOLD).toBe(20);
+    expect(DEFAULT_LOW_BALANCE_THRESHOLD).toBe("20.000000000");
     expect(DEFAULT_FAIL_THRESHOLD_N).toBe(3);
-    expect(ALERT_TYPES).toEqual(["LOW_BALANCE", "UNAVAILABLE", "KEY_FAILED"]);
+    expect(ALERT_TYPES).toEqual(["LOW_BALANCE", "ARREARS", "UNAVAILABLE", "CREDENTIAL_FAILED"]);
   });
 
   it("条件同时命中时一次返回多个候选（三种都应出现）", () => {
@@ -238,7 +263,7 @@ describe("导出常量与多类型同时命中", () => {
       key: { ...KEY, failCount: 4, lastStatus: "RATE_LIMITED" },
     });
     expect(results.map((r) => r.type).sort()).toEqual([
-      "KEY_FAILED",
+      "CREDENTIAL_FAILED",
       "LOW_BALANCE",
       "UNAVAILABLE",
     ]);

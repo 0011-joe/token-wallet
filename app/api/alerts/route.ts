@@ -1,36 +1,28 @@
 /**
- * /api/alerts —— 预警设置与事件（M6 / T6.3）。
+ * /api/alerts —— 预警设置与事件（v2 适配：credentialId/provider；阈值 Decimal）。
  *
- * GET /api/alerts：当前用户最近 50 条预警事件 + 当前预警设置。
- *   返回 { events: [{id,type,apiKeyId,message,severity,createdAt}], settings }。
- *   注意：severity 是后端按 type 映射的**派生字段，非数据库字段**
- *   （UNAVAILABLE→critical，其他→warning），便于前端直接渲染样式。
- * PUT /api/alerts：body { lowBalanceThreshold?, failThresholdN?, emailEnabled?, inappEnabled? }。
- *   - lowBalanceThreshold 必须为 >= 0 的数字（AC5：阈值不允许为负），否则 400；
+ * GET：当前用户最近 50 条预警事件 + 当前预警设置。
+ *   返回 { events: [{id,type,provider,credentialId,message,severity,createdAt}], settings }。
+ *   severity 是派生字段（UNAVAILABLE→critical，其他→warning），非数据库字段。
+ * PUT：body { lowBalanceThreshold?, failThresholdN?, emailEnabled?, inappEnabled? }。
+ *   - lowBalanceThreshold 必须为 >= 0 的数字（阈值不允许为负），否则 400；
  *   - failThresholdN 必须为正整数；两个开关必须为布尔；
- *   - 按 userId upsert AlertSetting（无记录则创建，默认值 = schema 默认值）。
- *
- * 鉴权：复用 lib/auth/current-user（getServerSession → email 回查 User，未登录 401）。
+ *   - 按 userId upsert AlertSetting（无记录则创建）。
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
-import {
-  DEFAULT_FAIL_THRESHOLD_N,
-  DEFAULT_LOW_BALANCE_THRESHOLD,
-  type AlertType,
-} from "@/lib/alerts/evaluate";
+import { DEFAULT_FAIL_THRESHOLD_N, type AlertType } from "@/lib/alerts/evaluate";
+import { toMoney } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
-/** severity 为派生字段（非表字段）：UNAVAILABLE→critical，其余→warning。 */
 function severityOf(type: string): "critical" | "warning" {
   return type === "UNAVAILABLE" ? "critical" : "warning";
 }
 
-/** schema 默认值（与 AlertSetting 的 @default 一致）。 */
 const DEFAULT_SETTINGS = {
-  lowBalanceThreshold: DEFAULT_LOW_BALANCE_THRESHOLD,
+  lowBalanceThreshold: "20.000000000",
   failThresholdN: DEFAULT_FAIL_THRESHOLD_N,
   emailEnabled: true,
   inappEnabled: true,
@@ -55,32 +47,34 @@ export async function GET(): Promise<NextResponse> {
     events: events.map((e) => ({
       id: e.id,
       type: e.type as AlertType,
-      apiKeyId: e.apiKeyId,
+      provider: e.provider,
+      credentialId: e.credentialId,
       message: e.message,
-      severity: severityOf(e.type), // 派生字段，非数据库列
+      severity: severityOf(e.type),
       createdAt: e.createdAt.toISOString(),
     })),
-    settings: settingsRow ?? DEFAULT_SETTINGS,
+    settings: settingsRow
+      ? {
+          lowBalanceThreshold: toMoney(settingsRow.lowBalanceThreshold),
+          failThresholdN: settingsRow.failThresholdN,
+          emailEnabled: settingsRow.emailEnabled,
+          inappEnabled: settingsRow.inappEnabled,
+        }
+      : DEFAULT_SETTINGS,
   });
 }
 
 interface SettingsUpdate {
-  lowBalanceThreshold?: number;
+  lowBalanceThreshold?: string;
   failThresholdN?: number;
   emailEnabled?: boolean;
   inappEnabled?: boolean;
 }
 
-/** 校验并抽取可更新字段；非法返回错误文案（undefined 项按缺省处理）。 */
 function parseSettingsUpdate(body: Record<string, unknown>):
   | { ok: true; data: SettingsUpdate }
   | { ok: false; error: string } {
-  const {
-    lowBalanceThreshold,
-    failThresholdN,
-    emailEnabled,
-    inappEnabled,
-  } = body;
+  const { lowBalanceThreshold, failThresholdN, emailEnabled, inappEnabled } = body;
   const data: SettingsUpdate = {};
 
   if (lowBalanceThreshold !== undefined) {
@@ -91,7 +85,7 @@ function parseSettingsUpdate(body: Record<string, unknown>):
     ) {
       return { ok: false, error: "低余额阈值必须是不小于 0 的数字" };
     }
-    data.lowBalanceThreshold = lowBalanceThreshold;
+    data.lowBalanceThreshold = toMoney(lowBalanceThreshold);
   }
   if (failThresholdN !== undefined) {
     if (
@@ -157,7 +151,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     settings: {
-      lowBalanceThreshold: saved.lowBalanceThreshold,
+      lowBalanceThreshold: toMoney(saved.lowBalanceThreshold),
       failThresholdN: saved.failThresholdN,
       emailEnabled: saved.emailEnabled,
       inappEnabled: saved.inappEnabled,

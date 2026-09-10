@@ -12,32 +12,39 @@ import {
   type TimedSnapshotPoint,
 } from "../lib/billing/snapshot-delta";
 
+const M = (n: number | string): string =>
+  typeof n === "number" ? n.toFixed(6) : n;
+
 const p = (
   currency: string,
-  totalBalance: number,
-  grantedBalance = 0,
-  toppedUpBalance = 0
-): SnapshotPoint => ({ currency, totalBalance, grantedBalance, toppedUpBalance });
+  available: number | string,
+  granted: number | string = 0,
+  toppedUp: number | string = 0
+): SnapshotPoint => ({
+  currency,
+  available: M(available),
+  breakdown: { granted: M(granted), toppedUp: M(toppedUp) },
+});
 
 const t = (iso: string): Date => new Date(iso);
 
-const pts = (...args: Array<[string, number, number, number, string]>): TimedSnapshotPoint[] =>
-  args.map(([currency, total, granted, toppedUp, fetchedAt]) => ({
-    ...p(currency, total, granted, toppedUp),
+const pts = (...args: Array<[string, number | string, number | string, number | string, string]>): TimedSnapshotPoint[] =>
+  args.map(([currency, available, granted, toppedUp, fetchedAt]) => ({
+    ...p(currency, available, granted, toppedUp),
     fetchedAt: t(fetchedAt),
   }));
 
 describe("deltaCost（规格卡 C 公式）", () => {
   it("纯消费：total 100→90，其余不变 → 10", () => {
-    expect(deltaCost(p("CNY", 100), p("CNY", 90))).toBe(10);
+    expect(deltaCost(p("CNY", 100), p("CNY", 90))).toBe("10.000000000");
   });
 
   it("充值当天：total 90→100，toppedUp 90→100 → 0（不被误计为收入）", () => {
-    expect(deltaCost(p("CNY", 90, 0, 90), p("CNY", 100, 0, 100))).toBe(0);
+    expect(deltaCost(p("CNY", 90, 0, 90), p("CNY", 100, 0, 100))).toBe("0.000000000");
   });
 
   it("消费+赠金：total 100→95，granted 0→5 → 5（净额：赠金到账 5 抵消部分消耗）", () => {
-    expect(deltaCost(p("CNY", 100, 0), p("CNY", 95, 5))).toBe(5);
+    expect(deltaCost(p("CNY", 100, 0), p("CNY", 95, 5))).toBe("5.000000000");
   });
 
   it("跨币种：CNY→USD → null（分开统计，不强行换算）", () => {
@@ -45,11 +52,11 @@ describe("deltaCost（规格卡 C 公式）", () => {
   });
 
   it("余额回充/调整（无充值字段变化）→ clamp 至 0，不计负消耗", () => {
-    expect(deltaCost(p("CNY", 90, 0, 0), p("CNY", 100, 0, 0))).toBe(0);
+    expect(deltaCost(p("CNY", 90, 0, 0), p("CNY", 100, 0, 0))).toBe("0.000000000");
   });
 
   it("消费+充值混合：total 100→95，toppedUp 0→10 → 5（官方恒等口径：充值到账使 total 上升，只按净额计）", () => {
-    expect(deltaCost(p("CNY", 100, 0, 0), p("CNY", 95, 0, 10))).toBe(5);
+    expect(deltaCost(p("CNY", 100, 0, 0), p("CNY", 95, 0, 10))).toBe("5.000000000");
   });
 });
 
@@ -62,7 +69,7 @@ describe("cumulativeCostFrom（今日/本月累计）", () => {
       ["CNY", 90, 0, 0, "2026-08-29T01:30:00Z"]
     );
     const dayStart = new Date("2026-08-29T00:00:00Z").getTime();
-    expect(cumulativeCostFrom(points, dayStart)).toBe(5); // 只算 08-29 内的段
+    expect(cumulativeCostFrom(points, dayStart)).toBe("5.000000000"); // 只算 08-29 内的段
   });
 
   it("AC3-1：无充值无赠金时等于当日首末快照总余额之差（逐段累加可对消）", () => {
@@ -73,7 +80,7 @@ describe("cumulativeCostFrom（今日/本月累计）", () => {
     );
     expect(
       cumulativeCostFrom(points, new Date("2026-08-28T00:00:00Z").getTime())
-    ).toBe(10); // 首末差 100-90=10；逐段 5+5=10
+    ).toBe("10.000000000"); // 首末差 100-90=10；逐段 5+5=10
   });
 
   it("fromMs 之后无快照 → 0", () => {
@@ -81,7 +88,7 @@ describe("cumulativeCostFrom（今日/本月累计）", () => {
       ["CNY", 100, 0, 0, "2026-08-28T10:00:00Z"],
       ["CNY", 90, 0, 0, "2026-08-28T11:00:00Z"]
     );
-    expect(cumulativeCostFrom(points, new Date("2026-09-01T00:00:00Z").getTime())).toBe(0);
+    expect(cumulativeCostFrom(points, new Date("2026-09-01T00:00:00Z").getTime())).toBe("0.000000000");
   });
 
   it("多币种：跨币种段跳过，各币种独立累计", () => {
@@ -93,7 +100,7 @@ describe("cumulativeCostFrom（今日/本月累计）", () => {
     );
     expect(
       cumulativeCostFrom(points, new Date("2026-08-28T00:00:00Z").getTime())
-    ).toBe(15); // CNY 10 + USD 5
+    ).toBe("15.000000000"); // CNY 10 + USD 5
   });
 });
 
@@ -104,7 +111,7 @@ describe("dailyAggregate（按天聚合）", () => {
       ["CNY", 90, 0, 0, "2026-08-28T11:00:00Z"]
     );
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 10, hasGap: false },
+      { date: "2026-08-28", cost: "10.000000000", hasGap: false },
     ]);
   });
 
@@ -114,7 +121,7 @@ describe("dailyAggregate（按天聚合）", () => {
       ["CNY", 90, 0, 0, "2026-08-28T13:00:00Z"] // 3h > 2h 缺口
     );
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 10, hasGap: true },
+      { date: "2026-08-28", cost: "10.000000000", hasGap: true },
     ]);
   });
 
@@ -124,7 +131,7 @@ describe("dailyAggregate（按天聚合）", () => {
       ["CNY", 90, 0, 0, "2026-08-28T12:00:00Z"] // 恰 2h
     );
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 10, hasGap: false },
+      { date: "2026-08-28", cost: "10.000000000", hasGap: false },
     ]);
   });
 
@@ -134,8 +141,8 @@ describe("dailyAggregate（按天聚合）", () => {
       ["CNY", 90, 0, 0, "2026-08-30T10:00:00Z"] // 48h 缺口
     );
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 10, hasGap: false }, // 段归起点日
-      { date: "2026-08-30", cost: 0, hasGap: true }, // 缺口日 08-29 无快照，跳过
+      { date: "2026-08-28", cost: "10.000000000", hasGap: false }, // 段归起点日
+      { date: "2026-08-30", cost: "0.000000000", hasGap: true }, // 缺口日 08-29 无快照，跳过
     ]);
   });
 
@@ -147,8 +154,8 @@ describe("dailyAggregate（按天聚合）", () => {
       ["CNY", 90, 0, 0, "2026-08-29T01:30:00Z"]
     );
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 5, hasGap: false },
-      { date: "2026-08-29", cost: 5, hasGap: false },
+      { date: "2026-08-28", cost: "5.000000000", hasGap: false },
+      { date: "2026-08-29", cost: "5.000000000", hasGap: false },
     ]);
   });
 
@@ -160,7 +167,7 @@ describe("dailyAggregate（按天聚合）", () => {
       ["USD", 95, 0, 0, "2026-08-28T10:03:00Z"]
     );
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 15, hasGap: false },
+      { date: "2026-08-28", cost: "15.000000000", hasGap: false },
     ]);
   });
 
@@ -172,7 +179,7 @@ describe("dailyAggregate（按天聚合）", () => {
     );
     const before = JSON.stringify(points);
     expect(dailyAggregate(points, DEFAULT_MAX_GAP_MS)).toEqual([
-      { date: "2026-08-28", cost: 10, hasGap: false },
+      { date: "2026-08-28", cost: "10.000000000", hasGap: false },
     ]);
     expect(JSON.stringify(points)).toBe(before);
   });

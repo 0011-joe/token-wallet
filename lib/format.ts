@@ -41,16 +41,21 @@ export function formatRelative(iso: string, now: number = Date.now()): string {
   return `${Math.floor(hours / 24)} 天前`;
 }
 
-/** 无相对时间的日期时间：2026/8/28 16:41 */
+/** 无相对时间的日期时间（展示统一 Asia/Shanghai，红线 #8）：2026/8/28 16:41 */
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${y}/${m}/${day} ${hh}:${mm}`;
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
 /** 当前 UTC 月份 "YYYY-MM"（与后端 CSV start_time_iso 的 UTC 口径一致） */

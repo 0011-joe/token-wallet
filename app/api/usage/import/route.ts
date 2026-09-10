@@ -18,6 +18,7 @@ import { authOptions } from "@/auth";
 import { db } from "@/lib/db";
 import { CsvParseError, parseCostCsv, parseUsageCsv, type ParsedCost } from "@/lib/usage/csv-parse";
 import { upsertUsageImport } from "@/lib/usage/import-store";
+import type { ProviderId } from "@/lib/providers/types";
 import { requireUserId } from "@/lib/usage/require-user";
 
 /** 10MB 上限（AC4：文件过大有大小限制与提示） */
@@ -43,6 +44,21 @@ export async function POST(request: Request): Promise<Response> {
     form = await request.formData();
   } catch {
     return NextResponse.json({ error: "表单解析失败" }, { status: 400 });
+  }
+
+  // v2（FR-4）：上传先选平台；v2.0 仅 deepseek 实现解析，其余提示「即将支持」
+  const providerEntry = form.get("provider");
+  if (typeof providerEntry !== "string" || !["deepseek", "kimi", "volcengine"].includes(providerEntry)) {
+    return NextResponse.json(
+      { error: "缺少或非法 provider 字段（deepseek | kimi | volcengine）" },
+      { status: 400 }
+    );
+  }
+  if (providerEntry !== "deepseek") {
+    return NextResponse.json(
+      { error: `${providerEntry} 用量导入即将支持，v2.0 暂仅支持 DeepSeek` },
+      { status: 400 }
+    );
   }
 
   const file = form.get("file");
@@ -131,6 +147,7 @@ export async function POST(request: Request): Promise<Response> {
       upsertUsageImport(
         tx,
         userId,
+        "deepseek" as ProviderId,
         parsed.month,
         fileName,
         parsed.rows,

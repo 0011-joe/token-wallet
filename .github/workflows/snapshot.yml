@@ -1,7 +1,7 @@
 # 每小时余额快照：调用部署环境的 /api/cron/snapshot
 # 前置配置（GitHub 仓库 Settings）：
 #   - Actions secrets: CRON_SECRET（与 Vercel 环境变量同名同值）
-#   - Actions variables: APP_URL（如 https://deepbalance.vercel.app）
+#   - Actions variables: APP_URL（如 https://token-wallet.vercel.app）
 name: hourly-snapshot
 
 on:

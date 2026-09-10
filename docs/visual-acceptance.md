@@ -1,4 +1,4 @@
-# DeepBalance 视觉与交互验收报告
+# token-wallet 视觉与交互验收报告
 
 - 执行：QA（swarm-B），日期 2026-08-29（UTC 2026-08-28 22:50 收官轮）
 - 环境：Windows / Node 24 / Edge（Playwright `channel: msedge`，headless）/ 服务 `next start` 端口 3000
@@ -110,7 +110,7 @@ T2b：`?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Flogin`（见 server.log）�
 ## 6. 复跑命令
 
 ```bash
-cd deepbalance && npm install -D playwright && npm run build
+cd token-wallet && npm install -D playwright && npm run build
 SNAPSHOT_GAP_MAX_MS=129600000 node scripts/visual-check/run-visual-check.js   # 25 项全绿即验收通过
 ```
 

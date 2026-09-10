@@ -13,6 +13,14 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { db } from "@/lib/db";
+import {
+  moneyAdd,
+  moneyCmp,
+  moneyDiv,
+  moneyToNumber,
+  toMoney,
+  type Money,
+} from "@/lib/money";
 import { USAGE_TYPES, type UsageType } from "@/lib/usage/csv-parse";
 import { requireUserId } from "@/lib/usage/require-user";
 
@@ -27,13 +35,21 @@ interface ModelAgg {
   tokens: number;
   /** request_count 的 amount 合计 */
   requests: number;
-  cost: number;
+  cost: Money;
   /** 分组键 = type + "::" + 单价；同键合并且单价相同 → 保留一档 */
-  byType: Map<string, { type: UsageType; unitPrice: number | null; amount: number; cost: number }>;
+  byType: Map<string, { type: UsageType; unitPrice: string | null; amount: number; cost: Money }>;
 }
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function moneyIsZeroForPct(m: Money): boolean {
+  return moneyCmp(m, toMoney("0")) === 0;
+}
+
+function moneyCmpForSort(a: Money, b: Money): number {
+  return moneyCmp(a, b);
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -43,16 +59,24 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const month = new URL(request.url).searchParams.get("month") ?? "";
+  const url = new URL(request.url);
+  const month = url.searchParams.get("month") ?? "";
   if (!MONTH_RE.test(month)) {
     return NextResponse.json(
       { error: "缺少或非法 month 参数（格式 YYYY-MM）" },
       { status: 400 }
     );
   }
+  const provider = url.searchParams.get("provider") ?? "";
+  if (!["deepseek", "kimi", "volcengine"].includes(provider)) {
+    return NextResponse.json(
+      { error: "缺少或非法 provider 参数（deepseek | kimi | volcengine）" },
+      { status: 400 }
+    );
+  }
 
   const imp = await db.usageImport.findUnique({
-    where: { userId_month: { userId, month } },
+    where: { userId_provider_month: { userId, provider: provider as import("@/lib/providers/types").ProviderId, month } },
     include: { rows: true },
   });
 
@@ -75,33 +99,33 @@ export async function GET(request: Request): Promise<Response> {
         model: row.model,
         tokens: 0,
         requests: 0,
-        cost: 0,
+        cost: toMoney("0"),
         byType: new Map(),
       };
       aggs.set(row.model, agg);
     }
-    agg.cost += row.cost;
+    agg.cost = moneyAdd(agg.cost, toMoney(row.cost));
     if (row.type === "request_count") {
       agg.requests += row.amount;
     } else {
       agg.tokens += row.amount;
     }
-    const key = `${row.type}::${row.unitPrice ?? ""}`;
+    const key = `${row.type}::${row.unitPrice?.toString() ?? ""}`;
     const entry = agg.byType.get(key);
     if (entry) {
       entry.amount += row.amount;
-      entry.cost += row.cost;
+      entry.cost = moneyAdd(entry.cost, toMoney(row.cost));
     } else {
       agg.byType.set(key, {
         type: row.type as UsageType,
-        unitPrice: row.unitPrice,
+        unitPrice: row.unitPrice !== null ? row.unitPrice.toString() : null,
         amount: row.amount,
-        cost: row.cost,
+        cost: toMoney(row.cost),
       });
     }
   }
 
-  const totalCost = [...aggs.values()].reduce((s, a) => s + a.cost, 0);
+  const totalCost = [...aggs.values()].reduce((s, a) => moneyAdd(s, a.cost), toMoney("0"));
 
   const models = [...aggs.values()]
     .map((a) => {
@@ -111,18 +135,22 @@ export async function GET(request: Request): Promise<Response> {
         .sort(
           (x, y) =>
             TYPE_ORDER.indexOf(x.type) - TYPE_ORDER.indexOf(y.type) ||
-            (x.unitPrice ?? -1) - (y.unitPrice ?? -1)
+            (x.unitPrice ?? "0").localeCompare(y.unitPrice ?? "0")
         )
         .map((e) => ({ type: e.type, amount: e.amount, cost: e.cost }));
       return {
         model: a.model,
         totalTokens,
         totalCost: a.cost,
-        sharePct: totalCost > 0 ? round2((a.cost / totalCost) * 100) : 0,
+        sharePct: !moneyIsZeroForPct(totalCost)
+          ? round2(moneyToNumber(moneyDiv(a.cost, totalCost)) * 100)
+          : 0,
         byType,
       };
     })
-    .sort((a, b) => b.totalCost - a.totalCost || a.model.localeCompare(b.model));
+    .sort(
+      (a, b) => moneyCmpForSort(b.totalCost, a.totalCost) || a.model.localeCompare(b.model)
+    );
 
   return NextResponse.json({
     month,

@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { TrendDay } from "@/lib/api-types";
-import { formatAxisMoney, formatMoney } from "@/lib/format";
+import { formatAxisMoney, formatMoney, moneyToNumber, toMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { EstimateBadge } from "./estimate-badge";
@@ -37,12 +37,16 @@ interface Point {
 }
 
 function toPoints(days: TrendDay[]): Point[] {
-  return days.map((d) => ({
-    date: d.date,
-    cost: d.hasGap ? null : d.cost,
-    gapCost: d.hasGap ? d.cost : null,
-    hasGap: d.hasGap,
-  }));
+  // 展示层绘图：Decimal 字符串 → number（图表坐标需要数值；金额运算仍在领域层为字符串）
+  return days.map((d) => {
+    const cost = moneyToNumber(d.cost);
+    return {
+      date: d.date,
+      cost: d.hasGap ? null : cost,
+      gapCost: d.hasGap ? cost : null,
+      hasGap: d.hasGap,
+    };
+  });
 }
 
 function tickDay(date: string): string {
@@ -84,7 +88,7 @@ function TrendTooltip({ active, payload, currency }: TrendTooltipProps & { curre
   return (
     <div className="rounded-lg bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg ring-1 ring-foreground/10">
       <p className="font-medium">{point.date}</p>
-      <p>估算消耗：{formatMoney(value, currency)}</p>
+      <p>估算消耗：{formatMoney(toMoney(value), currency)}</p>
       {point.hasGap ? (
         <p className="mt-0.5 text-amber-700 dark:text-amber-500">
           该日存在快照缺口，数值为相邻快照插值估算，可能偏低

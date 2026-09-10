@@ -1,6 +1,7 @@
-// DeepBalance Prisma schema
-// 数据库：云 Postgres（Neon）；金额用 Float（float8 精度足够个人工具；
-// 若改 Decimal 需同步改造 JSON 序列化——Prisma Decimal 会序列化为字符串）
+// token-wallet v2 Prisma schema（DEV-GUIDE §7 / PRD §8.2）
+// 数据库：云 Postgres（Neon）；金额一律 Decimal(18,9)（红线 #1，领域层禁 float）。
+// v1 → v2 破坏性升级：ApiKey→Credential、BalanceSnapshot 结构变更、幂等键升级；
+// 旧表在 migration 中改名为 *Legacy 保留，由 scripts/migrate-v1-to-v2.ts 搬数并回填。
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,7 +10,7 @@ datasource db {
   provider = "postgresql"
 }
 
-// ── Auth.js 模型 ──
+// ── Auth.js 模型（沿用 v1） ──
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -17,8 +18,9 @@ model User {
   name          String?
   image         String?
   createdAt     DateTime  @default(now())
-  keys          ApiKey[]
+  keys          Credential[]
   alerts        AlertSetting?
+  alertOverrides AlertOverride[]
   accounts      Account[]
   sessions      Session[]
 }
@@ -57,87 +59,138 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ── 业务模型（计划 §5，金额字段 SQLite 用 Float）──
+// ── 平台与凭证 ──
 
-// API Key：AES-256-GCM 密文落库，只暴露 last4（规格卡 A）
-model ApiKey {
-  id         String   @id @default(cuid())
-  userId     String
-  label      String // 用户备注名
-  ciphertext Bytes // AES-256-GCM 密文
-  iv         Bytes
-  authTag    Bytes
-  last4      String // 仅存 sk- 后 4 位用于展示
-  isActive   Boolean  @default(true)
-  failCount  Int      @default(0) // 连续失败次数
-  lastStatus String? // OK | INVALID | RATE_LIMITED | ERROR
-  createdAt  DateTime @default(now())
-  snapshots  BalanceSnapshot[]
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, last4])
+enum Provider {
+  deepseek
+  kimi
+  volcengine
 }
 
+enum CredentialKind {
+  bearer
+  aksk
+}
+
+enum BalanceMode {
+  native
+  derived
+  manual
+}
+
+// 凭证（v1 ApiKey 泛化）：bearer 单段 key；aksk 两段 ak+sk。
+// 密文统一 AES-256-GCM JSON 信封（规格卡 C，双格式兼容旧裸串密文）。
+model Credential {
+  id            String           @id @default(cuid())
+  userId        String
+  provider      Provider
+  kind          CredentialKind
+  region        String? // Kimi: v2.0 固定 'cn'；'intl' 为 v2.1 预留；其余 null
+  label         String // 用户备注名
+  secretCipher  Bytes // 加密信封 JSON：{"key":"sk-.."} 或 {"ak":"..","sk":".."}
+  iv            Bytes
+  authTag       Bytes
+  keyVersion    Int              @default(1) // 密钥版本位（FR-7，轮换工具 v2.1）
+  hint          String // 脱敏标识：last4 / AK 前缀+尾4 / 火山 AccountID
+  meta          Json? // 非敏感附加：火山 AccountID 等
+  isActive      Boolean          @default(true)
+  failCount     Int              @default(0) // 连续失败次数
+  lastStatus    String? // OK | INVALID | FORBIDDEN_SCOPE | RATE_LIMITED | ERROR
+  lastSuccessAt DateTime?
+  createdAt     DateTime         @default(now())
+  snapshots     BalanceSnapshot[]
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, hint])
+}
+
+// 余额快照（归一化后）：available 为统一主指标（Decimal 字符串纪律）。
 model BalanceSnapshot {
-  id              String   @id @default(cuid())
-  apiKeyId        String
-  fetchedAt       DateTime
-  currency        String // CNY | USD，分币种不混算
-  totalBalance    Float
-  grantedBalance  Float
-  toppedUpBalance Float
-  isAvailable     Boolean
-  ok              Boolean  @default(true) // 本次拉取是否成功
-  apiKey          ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  credentialId String
+  provider     Provider
+  mode         BalanceMode
+  fetchedAt    DateTime
+  currency     String // CNY | USD，分币种不混算
+  available    Decimal    @db.Decimal(18, 9) // 统一主指标：可用余额
+  breakdown    Json // {cash,granted,voucher,creditLimit,frozen,arrears}，缺项不出现
+  raw          Json? // 原始响应（脱敏）留存
+  isAvailable  Boolean
+  ok           Boolean    @default(true) // 本次拉取是否成功
+  stale        Boolean    @default(false) // 最近拉取失败、展示上次成功值的标记
+  credential   Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
 
-  @@index([apiKeyId, fetchedAt])
+  @@index([credentialId, provider, fetchedAt])
+  @@index([provider, fetchedAt])
 }
+
+// ── 用量（FR-4：按平台；幂等键 [userId, provider, month]） ──
 
 model UsageImport {
   id         String       @id @default(cuid())
   userId     String
-  month      String // YYYY-MM，幂等键
+  provider   Provider
+  month      String // YYYY-MM，幂等键组成部分
   fileName   String
   importedAt DateTime     @default(now())
   currency   String? // 来自 cost CSV（CNY | USD 等），null=未导入 cost 文件
   rows       ModelUsage[]
 
-  @@unique([userId, month])
+  @@unique([userId, provider, month])
 }
 
-// 按 M1 探针（Q1 真实样本）定型：官方 CSV 是 type×price 长表（峰谷各一档价格），
-// 一行 = 模型×Key×type×单价 的聚合；计划草案的宽表列（prompt/completion/cached）由 type 字段表达
+// 按 M1 探针定型的官方 CSV 长表：一行 = 模型×Key×type×单价 的聚合
 model ModelUsage {
-  id        String     @id @default(cuid())
+  id        String      @id @default(cuid())
   importId  String
+  provider  Provider // 平台冗余（与 UsageImport.provider 一致）
   model     String
   apiKeyRef String? // CSV 内分 Key 标识（官方已打码）
   type      String // input_cache_hit_tokens | input_cache_miss_tokens | output_tokens | request_count
-  unitPrice Float? // 每 token 单价；request_count 无价格
+  unitPrice Decimal?    @db.Decimal(18, 9) // 每 token 单价；request_count 无价格
   amount    Int // token 数或请求次数
-  cost      Float // price×amount 合计；request_count 为 0
+  cost      Decimal     @db.Decimal(18, 9) // price×amount 合计；request_count 为 0
   import    UsageImport @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   @@index([importId])
 }
 
+// ── 告警（FR-5：全局默认 + 平台/凭证覆盖；去重键业务唯一 + 时间窗） ──
+
 model AlertSetting {
   userId              String @id
-  lowBalanceThreshold Float  @default(20)
+  lowBalanceThreshold Decimal @default(20) @db.Decimal(18, 9)
   failThresholdN      Int    @default(3)
   emailEnabled        Boolean @default(true)
   inappEnabled        Boolean @default(true)
   user                User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model AlertEvent {
-  id        String   @id @default(cuid())
-  userId    String
-  apiKeyId  String
-  type      String // LOW_BALANCE | UNAVAILABLE | KEY_FAILED
-  message   String
-  dedupKey  String // 频控去重键
-  createdAt DateTime @default(now())
+// 平台/凭证级覆盖：provider 与 credentialId 均空 = 全局（应用层保证唯一，不做 DB 强制）
+model AlertOverride {
+  id                   String    @id @default(cuid())
+  userId               String
+  provider             Provider?
+  credentialId         String?
+  lowBalanceThreshold  Decimal?  @db.Decimal(18, 9)
+  failThresholdN       Int?
+  emailEnabled         Boolean?
+  inappEnabled         Boolean?
+  createdAt            DateTime  @default(now())
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([dedupKey, createdAt])
+  @@unique([userId, provider, credentialId])
+}
+
+model AlertEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     Provider
+  credentialId String?
+  type         String // LOW_BALANCE | ARREARS | CREDENTIAL_FAILED | UNAVAILABLE
+  message      String
+  dedupKey     String // 业务唯一键（type:credential 等），频控用时间窗判断（弃用 v1 复合唯一）
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

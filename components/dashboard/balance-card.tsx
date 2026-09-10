@@ -7,7 +7,8 @@ import { CalendarDays, CircleAlert, RefreshCw, Sun, Wallet } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { BalanceInfo, TodayMonthCost } from "@/lib/api-types";
-import { formatMoney, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
+import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { EstimateBadge } from "./estimate-badge";
@@ -23,14 +24,15 @@ export function BalanceCard({
   balance,
   today,
   month,
-  keyId,
-  keyLabel,
+  credentialId,
+  credentialLabel,
 }: {
   balance: BalanceInfo | null;
   today: TodayMonthCost;
   month: TodayMonthCost;
-  keyId?: string;
-  keyLabel?: string;
+  credentialId?: string;
+  credentialLabel?: string;
+  provider?: import("@/lib/api-types").ProviderId;
 }) {
   const unavailable = balance !== null && !balance.isAvailable;
   const [refreshing, setRefreshing] = useState(false);
@@ -39,11 +41,11 @@ export function BalanceCard({
 
   /** 手动触发：实时调官方余额接口 → 写快照 → 刷新看板数据 */
   async function handleRefresh() {
-    if (!keyId || refreshing) return;
+    if (!credentialId || refreshing) return;
     setRefreshing(true);
     setRefreshError(null);
     try {
-      const res = await fetch(`/api/keys/${keyId}/refresh`, { method: "POST" });
+      const res = await fetch(`/api/keys/${credentialId}/refresh`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         setRefreshError(body?.error ?? "刷新失败，请稍后重试");
@@ -109,7 +111,7 @@ export function BalanceCard({
                   "from-sky-500 via-blue-600 to-indigo-600 dark:from-sky-300 dark:via-blue-400 dark:to-indigo-400"
                 )}
               >
-                {formatMoney(balance.total, balance.currency)}
+                {formatMoney(balance.available, balance.currency)}
               </span>
               <span className="text-sm text-muted-foreground">{balance.currency}</span>
             </div>
@@ -128,16 +130,28 @@ export function BalanceCard({
               />
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>赠金 {formatMoney(balance.granted, balance.currency)}</span>
-              <span>充值 {formatMoney(balance.toppedUp, balance.currency)}</span>
-              <span>Key：{keyLabel ?? "—"}</span>
+              {balance.breakdown.granted !== undefined ? (
+                <span>赠金 {formatMoney(balance.breakdown.granted, balance.currency)}</span>
+              ) : null}
+              {balance.breakdown.cash !== undefined ? (
+                <span>充值 {formatMoney(balance.breakdown.cash, balance.currency)}</span>
+              ) : null}
+              {balance.breakdown.voucher !== undefined ? (
+                <span>代金券 {formatMoney(balance.breakdown.voucher, balance.currency)}</span>
+              ) : null}
+              {balance.breakdown.arrears !== undefined ? (
+                <span className="text-destructive">
+                  欠费 {formatMoney(balance.breakdown.arrears, balance.currency)}
+                </span>
+              ) : null}
+              <span>Key：{credentialLabel ?? "—"}</span>
             </div>
             {balance.byCurrency.length > 1 ? (
               <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
                 其他币种快照（不混算、不换算）：
                 {balance.byCurrency.map((c) => (
                   <span key={c.currency} className="rounded-md bg-muted px-1.5 py-0.5">
-                    {formatMoney(c.total, c.currency)}
+                    {formatMoney(c.available, c.currency)}
                   </span>
                 ))}
               </div>

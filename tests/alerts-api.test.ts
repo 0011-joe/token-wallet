@@ -13,6 +13,10 @@ import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { GET, PUT } from "../app/api/alerts/route";
 import { db } from "../lib/db";
+import { toMoney } from "../lib/money";
+
+// 无 DATABASE_URL 时显式跳过（开源 fork 未配置 DB secret 的 CI 场景）；本地/配置后全跑
+const describeDb = describe.skipIf(!process.env.DATABASE_URL);
 
 const EMAIL = `unit-alerts-${Date.now()}@test.local`;
 const USER_ID = `unit-alerts-${Date.now()}`;
@@ -41,7 +45,7 @@ afterAll(async () => {
   await db.user.delete({ where: { id: USER_ID } }).catch(() => {});
 });
 
-describe("PUT /api/alerts 设置校验与 upsert（AC5：阈值非负 / 渠道开关生效）", () => {
+describeDb("PUT /api/alerts 设置校验与 upsert（AC5：阈值非负 / 渠道开关生效）", () => {
   it("未登录 → 401", async () => {
     mockSession.mockResolvedValueOnce(null);
     const res = await PUT(putReq({ lowBalanceThreshold: 10 }));
@@ -77,18 +81,18 @@ describe("PUT /api/alerts 设置校验与 upsert（AC5：阈值非负 / 渠道�
       };
     };
     expect(body.settings).toMatchObject({
-      lowBalanceThreshold: 50,
+      lowBalanceThreshold: "50.000000000",
       failThresholdN: 5,
       emailEnabled: false,
       inappEnabled: true, // 未传字段沿用默认 true
     });
     const row = await db.alertSetting.findUnique({ where: { userId: USER_ID } });
     expect(row).toMatchObject({
-      lowBalanceThreshold: 50,
       failThresholdN: 5,
       emailEnabled: false,
       inappEnabled: true,
     });
+    expect(toMoney(row?.lowBalanceThreshold)).toBe("50.000000000");
   });
 
   it("部分更新（只传 inappEnabled）不覆盖已保存的其他字段", async () => {
@@ -96,7 +100,7 @@ describe("PUT /api/alerts 设置校验与 upsert（AC5：阈值非负 / 渠道�
     const res = await PUT(putReq({ inappEnabled: false }));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { settings: { lowBalanceThreshold: number } };
-    expect(body.settings.lowBalanceThreshold).toBe(50); // 保留上次保存值
+    expect(body.settings.lowBalanceThreshold).toBe("50.000000000"); // 保留上次保存值
     const row = await db.alertSetting.findUnique({ where: { userId: USER_ID } });
     expect(row?.inappEnabled).toBe(false);
   });
@@ -108,13 +112,14 @@ describe("PUT /api/alerts 设置校验与 upsert（AC5：阈值非负 / 渠道�
   });
 });
 
-describe("GET /api/alerts 设置与事件列表", () => {
+describeDb("GET /api/alerts 设置与事件列表", () => {
   it("返回设置 + 事件（severity 派生：UNAVAILABLE→critical，其他→warning）", async () => {
     mockSession.mockResolvedValueOnce(session(EMAIL));
     await db.alertEvent.create({
       data: {
         userId: USER_ID,
-        apiKeyId: "fake-key-1",
+        provider: "deepseek",
+        credentialId: "fake-key-1",
         type: "UNAVAILABLE",
         message: "Key sk-****d8d7 判定为不可用",
         dedupKey: "UNAVAILABLE:fake-key-1",
@@ -123,7 +128,8 @@ describe("GET /api/alerts 设置与事件列表", () => {
     await db.alertEvent.create({
       data: {
         userId: USER_ID,
-        apiKeyId: "fake-key-2",
+        provider: "deepseek",
+        credentialId: "fake-key-2",
         type: "LOW_BALANCE",
         message: "Key sk-****a1b2 余额 5CNY",
         dedupKey: "LOW_BALANCE:fake-key-2",
@@ -133,14 +139,14 @@ describe("GET /api/alerts 设置与事件列表", () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      settings: { lowBalanceThreshold: number; inappEnabled: boolean };
+      settings: { lowBalanceThreshold: string; inappEnabled: boolean };
       events: Array<{
         type: string;
         severity: string;
         createdAt: string;
       }>;
     };
-    expect(body.settings.lowBalanceThreshold).toBe(50);
+    expect(body.settings.lowBalanceThreshold).toBe("50.000000000");
     expect(body.settings.inappEnabled).toBe(false);
     // createdAt desc：LOW_BALANCE（后写的）在前
     expect(body.events.map((e) => e.type)).toEqual(["LOW_BALANCE", "UNAVAILABLE"]);

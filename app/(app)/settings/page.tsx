@@ -26,7 +26,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 interface AlertSettings {
-  lowBalanceThreshold: number;
+  /** 后端返回 Decimal 字符串（如 "20.000000000"） */
+  lowBalanceThreshold: string;
   failThresholdN: number;
   emailEnabled: boolean;
   inappEnabled: boolean;
@@ -35,14 +36,15 @@ interface AlertSettings {
 interface AlertEventItem {
   id: string;
   type: string;
-  apiKeyId: string;
+  provider: string;
+  credentialId: string | null;
   message: string;
   severity: "warning" | "critical";
   createdAt: string;
 }
 
 const DEFAULT_SETTINGS: AlertSettings = {
-  lowBalanceThreshold: 20,
+  lowBalanceThreshold: "20.000000000",
   failThresholdN: 3,
   emailEnabled: true,
   inappEnabled: true,
@@ -50,8 +52,10 @@ const DEFAULT_SETTINGS: AlertSettings = {
 
 const TYPE_LABELS: Record<string, string> = {
   LOW_BALANCE: "低余额",
+  ARREARS: "欠费",
   UNAVAILABLE: "不可用",
-  KEY_FAILED: "Key 异常",
+  CREDENTIAL_FAILED: "凭证异常",
+  KEY_FAILED: "凭证异常", // v1 旧类型兼容展示
 };
 
 function formatTime(iso: string): string {
@@ -336,7 +340,7 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">加载中…</p>
                 ) : events.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    暂无预警事件。当前余额正常、Key 可用，或尚未触发任何阈值。
+                    暂无预警事件。当前余额正常、凭证可用，或尚未触发任何阈值。
                   </p>
                 ) : (
                   <ul className="flex flex-col divide-y divide-border">

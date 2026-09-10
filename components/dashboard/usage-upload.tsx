@@ -14,9 +14,12 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
  */
 export function UsageUpload({
   onImported,
+  provider,
 }: {
   /** 导入成功回调（父组件负责刷新 models 查询） */
   onImported: () => void;
+  /** 用量归属平台（v2.0 仅 deepseek 实现解析） */
+  provider: import("@/lib/api-types").ProviderId;
 }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -48,7 +51,7 @@ export function UsageUpload({
     }
     setUploading(true);
     try {
-      const res = await importUsageCsv(file, costFile);
+      const res = await importUsageCsv(provider, file, costFile);
       setSuccess(
         costFile
           ? `已导入 ${res.month}：${res.rows} 行 / ${res.models} 个模型（含 cost 币种）`
@@ -61,6 +64,15 @@ export function UsageUpload({
     } finally {
       setUploading(false);
     }
+  }
+
+  if (provider !== "deepseek") {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+        {provider === "kimi" ? "Kimi" : "豆包（火山引擎）"} 用量导入即将支持（v2.0 暂仅支持
+        DeepSeek）。余额监控不受影响。
+      </div>
+    );
   }
 
   return (

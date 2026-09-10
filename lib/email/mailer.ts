@@ -27,7 +27,7 @@ export type SendMailResult =
   | { ok: false; error: string; channel: "resend" | "smtp" | "unconfigured" };
 
 function emailFrom(): string {
-  return process.env.SMTP_FROM ?? "DeepBalance <noreply@example.com>";
+  return process.env.SMTP_FROM ?? "token-wallet <noreply@example.com>";
 }
 
 function smtpPort(): number | undefined {

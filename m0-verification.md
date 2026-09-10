@@ -12,7 +12,7 @@
 ## T0.1 骨架收尾
 - `npm run build`：通过（见下方 build 输出摘要）。
 - shadcn：`npx shadcn@latest init -d` 成功（style=base-nova），`add button card input label` 成功。
-- 落地页 `app/page.tsx`：DeepBalance / DeepSeek 用量监控 / 登录按钮。
+- 落地页 `app/page.tsx`：token-wallet / DeepSeek 用量监控 / 登录按钮。
 - 协调项：另一 agent 在 `scripts/` 的 WIP 文件会让 tsc/eslint 全项目报错（重复声明），已把 `scripts/`（与 `prisma/**`）从 tsconfig exclude 与 eslint globalIgnores 排除——**未修改 scripts/ 下任何文件**。
 
 ## T0.2 Prisma + SQLite

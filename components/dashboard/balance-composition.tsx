@@ -1,7 +1,5 @@
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-
 import {
   Card,
   CardContent,
@@ -9,23 +7,40 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import type { BalanceInfo } from "@/lib/api-types";
-import { formatMoney, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
+import {
+  formatMoney,
+  moneyDiv,
+  moneyIsPositive,
+  moneyToNumber,
+} from "@/lib/money";
+
+interface Slice {
+  name: string;
+  key: string;
+  value: string;
+  color: string;
+}
 
 /**
- * 余额构成卡：赠金 / 充值环形图 + 明细（PRD §7.3）。
- * 蓝系双色（chart-1 赠金 / chart-5 充值），取色走 CSS 变量随主题切换。
+ * 余额构成卡（FR-3 / AC3.4）：按真实字段渲染、缺项优雅隐藏。
+ * DeepSeek → 赠金/充值；Kimi → 现金/代金券/欠费；火山 → 现金/信控/冻结/欠费。
  */
 export function BalanceComposition({ balance }: { balance: BalanceInfo | null }) {
-  const total = balance?.total ?? 0;
-  const granted = balance?.granted ?? 0;
-  const toppedUp = balance?.toppedUp ?? 0;
-  const pieData = balance
-    ? [
-        { name: "赠金", value: granted },
-        { name: "充值", value: toppedUp },
-      ]
+  const available = balance?.available ?? "0";
+  const slices: Slice[] = balance
+    ? ([
+        { name: "赠金", key: "granted", value: balance.breakdown.granted, color: "var(--chart-1)" },
+        { name: "代金券", key: "voucher", value: balance.breakdown.voucher, color: "var(--chart-1)" },
+        { name: "充值", key: "cash", value: balance.breakdown.cash, color: "var(--chart-5)" },
+        { name: "信控", key: "creditLimit", value: balance.breakdown.creditLimit, color: "var(--chart-2)" },
+        { name: "冻结", key: "frozen", value: balance.breakdown.frozen, color: "var(--chart-3)" },
+      ].filter((s): s is Slice => typeof s.value === "string") as Slice[])
     : [];
+
+  const hasComposition = balance !== null && moneyIsPositive(available) && slices.length > 0;
 
   return (
     <Card className="flex flex-col">
@@ -34,17 +49,17 @@ export function BalanceComposition({ balance }: { balance: BalanceInfo | null })
           余额构成
         </CardTitle>
         <CardDescription>
-          {balance ? `赠金 / 充值（${balance.currency}）` : "暂无快照数据"}
+          {balance ? `可用 ${formatMoney(available, balance.currency)}` : "暂无快照数据"}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
-        {balance && total > 0 ? (
+        {hasComposition ? (
           <>
             <div className="relative mx-auto size-40 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={pieData}
+                    data={slices.map((s) => ({ name: s.name, value: moneyToNumber(s.value) }))}
                     dataKey="value"
                     nameKey="name"
                     innerRadius={54}
@@ -53,53 +68,40 @@ export function BalanceComposition({ balance }: { balance: BalanceInfo | null })
                     strokeWidth={0}
                     isAnimationActive={false}
                   >
-                    <Cell fill="var(--chart-1)" />
-                    <Cell fill="var(--chart-5)" />
+                    {slices.map((s) => (
+                      <Cell key={s.key} fill={s.color} />
+                    ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-lg font-semibold tracking-tight">
-                  {formatMoney(total, balance.currency)}
+                  {formatMoney(available, balance.currency)}
                 </span>
-                <span className="text-xs text-muted-foreground">总额</span>
+                <span className="text-xs text-muted-foreground">可用</span>
               </div>
             </div>
             <ul className="flex flex-col gap-2 text-sm">
-              <li className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <span
-                    aria-hidden
-                    className="size-2.5 rounded-full"
-                    style={{ background: "var(--chart-1)" }}
-                  />
-                  赠金
-                </span>
-                <span className="tabular-nums">
-                  {formatMoney(granted, balance.currency)}（
-                  {((granted / total) * 100).toFixed(1)}%）
-                </span>
-              </li>
-              <li className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <span
-                    aria-hidden
-                    className="size-2.5 rounded-full"
-                    style={{ background: "var(--chart-5)" }}
-                  />
-                  充值
-                </span>
-                <span className="tabular-nums">
-                  {formatMoney(toppedUp, balance.currency)}（
-                  {((toppedUp / total) * 100).toFixed(1)}%）
-                </span>
-              </li>
+              {slices.map((s) => {
+                const pct = (moneyToNumber(moneyDiv(s.value, available)) * 100).toFixed(1);
+                return (
+                  <li key={s.key} className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <span aria-hidden className="size-2.5 rounded-full" style={{ background: s.color }} />
+                      {s.name}
+                    </span>
+                    <span className="tabular-nums">
+                      {formatMoney(s.value, balance.currency)}（{pct}%）
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
             {balance
-              ? "余额为 0，暂无构成数据。"
+              ? "余额为 0 或该平台未提供构成明细，暂无构成数据。"
               : "暂无余额快照，快照任务会按小时拉取一次。"}
           </p>
         )}
@@ -108,7 +110,7 @@ export function BalanceComposition({ balance }: { balance: BalanceInfo | null })
             <p>其他币种快照（不混算、不换算）：</p>
             {balance.byCurrency.map((c) => (
               <p key={c.currency}>
-                {formatMoney(c.total, c.currency)} · 更新于{" "}
+                {formatMoney(c.available, c.currency)} · 更新于{" "}
                 {formatRelative(c.fetchedAt)}
               </p>
             ))}

@@ -41,7 +41,7 @@ export default function LoginPage() {
 
   return (
     <div className="w-full max-w-sm">
-      <h1 className="text-2xl font-semibold tracking-tight">登录 DeepBalance</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">登录 token-wallet</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         输入邮箱，我们会发送一次性魔法链接。
       </p>

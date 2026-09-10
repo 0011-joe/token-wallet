@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TodayMonthCost } from "@/lib/api-types";
-import { formatMoney } from "@/lib/format";
+import { formatMoney } from "@/lib/money";
 
 import { EstimateBadge } from "./estimate-badge";
 

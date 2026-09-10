@@ -1,73 +1,85 @@
 /**
- * 前端 API 契约类型 —— 与后端 app/api/** 的响应结构一一对应。
- * 只做类型声明，不改后端；字段以后端实现为准（见各 route.ts 注释）。
+ * 前端 API 契约类型 —— 与后端 app/api/** 的响应结构一一对应（v2：多 Provider + Decimal 字符串）。
+ * 只做类型声明，不改后端；字段以后端实现为准。
  */
 
-/** 单条 Key 的对外视图（/api/keys、/api/dashboard.key 共用） */
-export interface ApiKeySummary {
+export type ProviderId = "deepseek" | "kimi" | "volcengine";
+export type CredentialKind = "bearer" | "aksk";
+
+/** 单条凭证的对外视图（/api/credentials、/api/dashboard.credential 共用） */
+export interface CredentialSummary {
   id: string;
+  provider: ProviderId;
+  kind: CredentialKind;
+  region: string | null;
   label: string;
-  last4: string;
+  /** 脱敏标识：last4 / AK 前缀+尾4 */
+  hint: string;
   isActive: boolean;
   failCount: number;
-  /** OK | INVALID | RATE_LIMITED | ERROR（见 lib/keys/repo.ts） */
+  /** OK | INVALID | FORBIDDEN_SCOPE | RATE_LIMITED | ERROR */
   lastStatus: string | null;
-  /** ISO 时间字符串 */
+  lastSuccessAt: string | null;
   createdAt: string;
 }
 
-export interface KeysResponse {
-  keys: ApiKeySummary[];
+export interface CredentialsResponse {
+  credentials: CredentialSummary[];
 }
 
-/** 单币种余额快照视图（/api/dashboard.balance.byCurrency 单项） */
+export interface CreateCredentialResponse {
+  credential: CredentialSummary;
+  firstBalance: {
+    mode: "native";
+    isAvailable: boolean;
+    balances: Array<{
+      currency: string;
+      available: string;
+      breakdown: Record<string, string | undefined>;
+    }>;
+  };
+}
+
+/** 单币种余额快照视图（金额全部 Decimal 字符串） */
 export interface BalanceView {
   currency: string;
-  total: number;
-  granted: number;
-  toppedUp: number;
+  available: string;
+  breakdown: Record<string, string | undefined>;
   isAvailable: boolean;
   fetchedAt: string;
 }
 
-/** 今日 / 本月消耗（估算口径） */
 export interface TodayMonthCost {
-  cost: number;
+  /** Decimal 字符串（估算口径） */
+  cost: string;
   /** snapshot=有快照基准；no-snapshot=快照不足（<2 个），cost 恒为 0 */
   from: "snapshot" | "no-snapshot";
   currency: string;
 }
 
-/** 趋势单日数据（UTC） */
 export interface TrendDay {
-  /** YYYY-MM-DD */
   date: string;
-  cost: number;
-  /** 该日存在快照缺口（数据恢复日），UI 画出断点 / 插值样式 */
+  cost: string;
   hasGap: boolean;
 }
 
 export interface DashboardData {
-  key: ApiKeySummary;
-  /** 主卡币种（CNY 优先）的最新快照；无任何快照时为 null */
+  credential: CredentialSummary;
   balance: (BalanceView & { stale: boolean; byCurrency: BalanceView[] }) | null;
   today: TodayMonthCost;
   month: TodayMonthCost;
   trend: { range: number; days: TrendDay[] };
-  /** 恒为 true：所有消耗均为快照差值估算，UI 必须标注 */
   isEstimate: true;
   generatedAt: string;
 }
 
 export type BalanceInfo = NonNullable<DashboardData["balance"]>;
 
-/** 后端错误响应（/api/dashboard 为 { ok:false, error }，其余为 { error }） */
 export interface ApiErrorBody {
   ok?: false;
   error: string;
 }
 
-/** /api/usage/models —— type 取值全集（不得增删，见 lib/usage/csv-parse.ts） */
 export type UsageType =
   | "input_cache_hit_tokens"
   | "input_cache_miss_tokens"
@@ -76,33 +88,83 @@ export type UsageType =
 
 export interface ModelUsageTypeRow {
   type: UsageType;
-  /** token 数或请求次数 */
   amount: number;
-  cost: number;
+  cost: string;
 }
 
 export interface ModelUsageRow {
   model: string;
   totalTokens: number;
-  totalCost: number;
-  /** 占当月总费用百分比（2 位小数） */
+  totalCost: string;
   sharePct: number;
   byType: ModelUsageTypeRow[];
 }
 
 export interface ModelsResponse {
-  /** YYYY-MM */
   month: string;
   models: ModelUsageRow[];
-  totalCost: number;
+  totalCost: string;
   totalTokens: number;
-  /** cost 文件未接入，恒为 null */
   currency: string | null;
 }
 
-/** POST /api/usage/import 成功响应 */
 export interface ImportUsageResponse {
   month: string;
   rows: number;
   models: number;
+}
+
+export interface AlertSettings {
+  /** Decimal 字符串 */
+  lowBalanceThreshold: string;
+  failThresholdN: number;
+  emailEnabled: boolean;
+  inappEnabled: boolean;
+}
+
+export interface AlertEventView {
+  id: string;
+  type: string;
+  provider: ProviderId;
+  credentialId: string | null;
+  message: string;
+  severity: "critical" | "warning";
+  createdAt: string;
+}
+
+export interface AlertsResponse {
+  events: AlertEventView[];
+  settings: AlertSettings;
+}
+
+export interface RefreshResponse {
+  ok: boolean;
+  snapshots: number;
+  latest: {
+    currency: string;
+    available: string;
+    isAvailable: boolean;
+    fetchedAt: string;
+  } | null;
+}
+
+export interface OverviewCurrency {
+  currency: string;
+  totalAvailable: string;
+  credentialCount: number;
+  latestFetchedAt: string | null;
+}
+
+export interface OverviewPlatform {
+  provider: ProviderId;
+  credentialCount: number;
+  failedCount: number;
+  staleCount: number;
+  byCurrency: Array<{ currency: string; available: string; credentialCount: number }>;
+  latestFetchedAt: string | null;
+}
+
+export interface DashboardOverview {
+  overview: { currencies: OverviewCurrency[]; platforms: OverviewPlatform[]; generatedAt: string };
+  isEstimate: true;
 }

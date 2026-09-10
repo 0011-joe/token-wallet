@@ -3,35 +3,36 @@
 import { CircleAlert, CircleCheck } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ApiKeySummary, BalanceInfo } from "@/lib/api-types";
+import type { BalanceInfo, CredentialSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 
 /** lastStatus 的用户可读文案（仅作展示用键名） */
 const STATUS_TEXT: Record<string, string> = {
   OK: "正常",
-  INVALID: "Key 无效",
+  INVALID: "凭证无效",
+  FORBIDDEN_SCOPE: "权限不足",
   RATE_LIMITED: "接口限流",
   ERROR: "接口错误",
 };
 
 /**
  * 账户状态卡：可调用 / 余额不足（AC2-2 状态不依赖颜色——图标 + 文字）。
- * 附 Key 拉取异常（lastStatus / failCount）与停用提示。
+ * 附凭证拉取异常（lastStatus / failCount）与停用提示。
  */
 export function StatusCard({
-  apiKey,
+  credential,
   balance,
 }: {
-  apiKey: ApiKeySummary;
+  credential: CredentialSummary;
   balance: BalanceInfo | null;
 }) {
-  const inactive = !apiKey.isActive;
+  const inactive = !credential.isActive;
   const unavailable = balance !== null && !balance.isAvailable;
 
   let label: string;
   let tone: "ok" | "bad" | "muted";
   if (inactive) {
-    label = "Key 已停用";
+    label = "凭证已停用";
     tone = "muted";
   } else if (unavailable) {
     label = "余额不足，无法调用";
@@ -44,7 +45,7 @@ export function StatusCard({
     tone = "ok";
   }
 
-  const keyLabel = apiKey.label || `sk-…${apiKey.last4}`;
+  const credLabel = credential.label || credential.hint;
 
   return (
     <Card className="flex flex-col">
@@ -78,16 +79,16 @@ export function StatusCard({
         ) : null}
         {tone === "muted" && inactive ? (
           <p className="text-xs text-muted-foreground">
-            已停止快照拉取，可到 Key 管理页重新启用
+            已停止快照拉取，可到凭证管理页重新启用
           </p>
         ) : null}
-        {!inactive && apiKey.lastStatus && apiKey.failCount > 0 ? (
+        {!inactive && credential.lastStatus && credential.failCount > 0 ? (
           <p className="text-xs text-amber-700 dark:text-amber-500">
-            余额拉取异常：{STATUS_TEXT[apiKey.lastStatus] ?? apiKey.lastStatus} ·
-            连续失败 {apiKey.failCount} 次
+            余额拉取异常：{STATUS_TEXT[credential.lastStatus] ?? credential.lastStatus} ·
+            连续失败 {credential.failCount} 次
           </p>
         ) : null}
-        <p className="mt-auto text-xs text-muted-foreground">Key：{keyLabel}</p>
+        <p className="mt-auto text-xs text-muted-foreground">凭证：{credLabel}</p>
       </CardContent>
     </Card>
   );

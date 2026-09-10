@@ -1,4 +1,4 @@
-# DeepBalance 视觉验收（visual-check）
+# token-wallet 视觉验收（visual-check）
 
 真实浏览器（Playwright + 本机 Microsoft Edge，`channel: msedge`，无需下载浏览器）对仪表盘、Key 管理、设置页做端到端视觉/交互验收，并自动登录（魔法链接从服务端控制台日志提取）。
 
@@ -15,7 +15,7 @@
 ## 复跑步骤
 
 ```bash
-cd deepbalance
+cd token-wallet
 npm install -D playwright --fetch-retries=5 --fetch-timeout=180000   # 首次
 npm run build                                                        # 业务代码变更后需重构建
 node scripts/visual-check/run-visual-check.js

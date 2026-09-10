@@ -23,6 +23,9 @@ import { GET as exportGET } from "../app/api/account/export/route";
 import { db } from "../lib/db";
 import { encryptKey } from "../lib/crypto/key-vault";
 
+// 无 DATABASE_URL 时显式跳过（开源 fork 未配置 DB secret 的 CI 场景）；本地/配置后全跑
+const describeDb = describe.skipIf(!process.env.DATABASE_URL);
+
 const RUN = Date.now();
 const EMAIL = `unit-account-${RUN}@test.local`;
 const USER_ID = `unit-account-${RUN}`;
@@ -48,40 +51,47 @@ beforeEach(async () => {
   await db.user.create({ data: { id: USER_ID, email: EMAIL } });
 });
 
-/** 灌入：1 个 Key + 1 条快照 + 1 个月份导入 + 预警设置 + 1 条预警事件。 */
+/** 灌入：1 个凭证 + 1 条快照 + 1 个月份导入 + 预警设置 + 1 条预警事件。 */
 async function seedAccount() {
   const enc = encryptKey(PLAINTEXT_KEY);
-  const key = await db.apiKey.create({
+  const key = await db.credential.create({
     data: {
       userId: USER_ID,
+      provider: "deepseek",
+      kind: "bearer",
+      region: null,
       label: "测试Key",
-      ciphertext: new Uint8Array(enc.ciphertext),
+      secretCipher: new Uint8Array(enc.ciphertext),
       iv: new Uint8Array(enc.iv),
       authTag: new Uint8Array(enc.authTag),
-      last4: LAST4,
+      hint: LAST4,
+      keyVersion: 1,
       isActive: true,
     },
   });
   await db.balanceSnapshot.create({
     data: {
-      apiKeyId: key.id,
+      credentialId: key.id,
+      provider: "deepseek",
+      mode: "native",
       fetchedAt: new Date(),
       currency: "CNY",
-      totalBalance: 100,
-      grantedBalance: 0,
-      toppedUpBalance: 100,
+      available: "100.000000000",
+      breakdown: { granted: "0.000000000", toppedUp: "100.000000000" },
       isAvailable: true,
       ok: true,
+      stale: false,
     },
   });
   await db.usageImport.create({
-    data: { userId: USER_ID, month: MONTH, fileName: "amount.csv" },
+    data: { userId: USER_ID, provider: "deepseek", month: MONTH, fileName: "amount.csv" },
   });
   await db.alertSetting.create({ data: { userId: USER_ID } });
   await db.alertEvent.create({
     data: {
       userId: USER_ID,
-      apiKeyId: key.id,
+      provider: "deepseek",
+      credentialId: key.id,
       type: "LOW_BALANCE",
       message: "余额低于阈值",
       dedupKey: `unit-account-${RUN}-dedup`,
@@ -98,7 +108,7 @@ function deleteRequest(body: unknown): Request {
   });
 }
 
-describe("DELETE /api/account（AC6-2）", () => {
+describeDb("DELETE /api/account（AC6-2）", () => {
   it("未登录 → 401", async () => {
     mockSession.mockResolvedValue(null);
     const res = await DELETE(deleteRequest({ confirm: true }));
@@ -121,14 +131,14 @@ describe("DELETE /api/account（AC6-2）", () => {
     expect(res.status).toBe(204);
 
     expect(await db.user.findUnique({ where: { id: USER_ID } })).toBeNull();
-    expect(await db.apiKey.count({ where: { userId: USER_ID } })).toBe(0);
-    expect(await db.balanceSnapshot.count({ where: { apiKeyId: key.id } })).toBe(0);
+    expect(await db.credential.count({ where: { userId: USER_ID } })).toBe(0);
+    expect(await db.balanceSnapshot.count({ where: { credentialId: key.id } })).toBe(0);
     expect(await db.alertSetting.count({ where: { userId: USER_ID } })).toBe(0);
     // AlertEvent / UsageImport 无 User relation、无自动级联：必须被 deleteAccount 手动删
     expect(await db.alertEvent.count({ where: { userId: USER_ID } })).toBe(0);
     expect(await db.usageImport.count({ where: { userId: USER_ID } })).toBe(0);
     // 数据面证据（AC6-2「不再被定时任务调用」）：cron 遍历的 isActive=true 集合已无本用户 Key
-    const activeKeys = await db.apiKey.findMany({ where: { isActive: true } });
+    const activeKeys = await db.credential.findMany({ where: { isActive: true } });
     expect(activeKeys.some((k) => k.id === key.id)).toBe(false);
   });
 
@@ -141,7 +151,7 @@ describe("DELETE /api/account（AC6-2）", () => {
   });
 });
 
-describe("GET /api/account/export", () => {
+describeDb("GET /api/account/export", () => {
   it("导出：附件下载、元信息齐全、无密文/无明文 Key（红线）", async () => {
     mockSession.mockResolvedValue(session(EMAIL));
     const { enc } = await seedAccount();
@@ -160,15 +170,17 @@ describe("GET /api/account/export", () => {
     const body = JSON.parse(raw);
     expect(body.user.email).toBe(EMAIL);
     expect(body.exports?.[0]).toBeUndefined(); // 惰性断言：不存在 export 类字段（防未来误加）
-    expect(body.keys).toHaveLength(1);
-    const k = body.keys[0];
-    expect(k).toMatchObject({ label: "测试Key", last4: LAST4, isActive: true });
+    expect(body.credentials).toHaveLength(1);
+    const k = body.credentials[0];
+    expect(k).toMatchObject({ provider: "deepseek", label: "测试Key", hint: LAST4, isActive: true });
+    expect(k).not.toHaveProperty("secretCipher");
     expect(k).not.toHaveProperty("ciphertext");
     expect(k).not.toHaveProperty("iv");
     expect(k).not.toHaveProperty("authTag");
     expect(body.snapshots).toHaveLength(1);
-    expect(body.snapshots[0]).not.toHaveProperty("apiKeyId");
+    expect(body.snapshots[0]).toHaveProperty("credentialId");
     expect(body.snapshots[0]).toHaveProperty("currency");
+    expect(body.snapshots[0]).not.toHaveProperty("secretCipher");
     expect(body.usageImports.map((i: { month: string }) => i.month)).toContain(MONTH);
     expect(body.alertSetting).not.toBeNull();
   });

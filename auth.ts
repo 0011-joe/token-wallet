@@ -29,7 +29,7 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     Email({
-      from: process.env.SMTP_FROM ?? "DeepBalance <noreply@localhost>",
+      from: process.env.SMTP_FROM ?? "token-wallet <noreply@localhost>",
       async sendVerificationRequest({ identifier, url }) {
         const smtpConfigured = Boolean(
           process.env.SMTP_HOST &&

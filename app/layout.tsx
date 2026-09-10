@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DeepBalance",
+  title: "token-wallet",
   description: "DeepSeek 用量监控",
 };
 

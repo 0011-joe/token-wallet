@@ -76,7 +76,7 @@ describe("M6 预警邮件 sendAlertEmail（lib/email/send.ts）", () => {
     expect(arg.to).toBe("user@example.com");
     expect(arg.subject).toBe("预警 subject");
     expect(arg.html).toBe("<p>余额预警：sk-****1234</p>");
-    expect(arg.from).toContain("DeepBalance");
+    expect(arg.from).toContain("token-wallet");
     // 红线：发送参数不得含 API Key 明文（注意掩码 sk-****1234 允许存在）
     const serialized = JSON.stringify(arg);
     expect(serialized).not.toContain(secretKey);
@@ -253,8 +253,8 @@ describe("魔法链接邮件 sendVerificationRequestEmail（lib/email/verificati
     expect(mailerSendMailMock).toHaveBeenCalledTimes(1);
     const arg = mailerSendMailMock.mock.calls[0][0];
     expect(arg.to).toBe("user@example.com");
-    expect(arg.subject).toBe("DeepBalance 登录链接");
-    expect(arg.html).toContain("登录 DeepBalance");
+    expect(arg.subject).toBe("token-wallet 登录链接");
+    expect(arg.html).toContain("登录 token-wallet");
     // 链接以 HTML 转义形式嵌入（& → &amp;），token 值本身原样保留
     expect(arg.html).toContain(fakeUrl.replace(/&/g, "&amp;"));
     expect(arg.html).toContain("fake-token-abc123");

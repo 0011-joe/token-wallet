@@ -8,23 +8,26 @@ import { Bell, LogOut, User } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { KeySwitcher } from "@/components/dashboard/key-switcher";
+import { CredSwitcher } from "@/components/dashboard/cred-switcher";
 import { cn } from "@/lib/utils";
-import { fetchKeys } from "@/lib/api-client";
+import { fetchCredentials } from "@/lib/api-client";
 
 /** 顶栏：产品名、Key 切换下拉、预警铃铛 → /settings、账户入口 → /settings、登出。 */
 export function TopBar() {
   const router = useRouter();
   const params = useSearchParams();
-  const selectedKeyId = params.get("keyId");
+  const selectedCredentialId = params.get("credentialId");
 
-  const { data } = useQuery({ queryKey: ["keys"], queryFn: fetchKeys });
-  const keys = data?.keys ?? [];
-  const selected = keys.find((k) => k.id === selectedKeyId) ?? null;
+  const { data } = useQuery({ queryKey: ["credentials"], queryFn: fetchCredentials });
+  const credentials = data?.credentials ?? [];
+  const selected = credentials.find((c) => c.id === selectedCredentialId) ?? null;
 
   function handleSelect(id: string) {
-    if (!id) return;
-    router.push(`/dashboard?keyId=${encodeURIComponent(id)}`);
+    if (!id) {
+      router.push("/dashboard"); // 空 = 总览
+      return;
+    }
+    router.push(`/dashboard?credentialId=${encodeURIComponent(id)}`);
   }
 
   async function handleSignOut() {
@@ -40,12 +43,12 @@ export function TopBar() {
           href="/dashboard"
           className="flex shrink-0 items-center font-heading text-base font-semibold tracking-tight"
         >
-          DeepBalance
+          token-wallet
         </Link>
         <span aria-hidden className="hidden h-4 w-px bg-border sm:block" />
-        <KeySwitcher
-          keys={keys}
-          selectedKeyId={selected?.id ?? null}
+        <CredSwitcher
+          credentials={credentials}
+          selectedId={selected?.id ?? null}
           onSelect={handleSelect}
         />
         <div className="ml-auto flex items-center gap-1">

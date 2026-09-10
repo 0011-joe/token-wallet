@@ -1,15 +1,15 @@
 /**
- * M7/T7.2 数据导出（PRD §8 隐私：「提供数据导出」；FR-6 正常能力）。
+ * 数据导出（PRD 隐私：「提供数据导出」）。
  *
  * GET /api/account/export —— 以 JSON 附件下载当前用户可导出的数据：
  *   - user：id + email；
- *   - keys：元信息（label/last4/isActive/failCount/lastStatus/createdAt）；
- *   - snapshots：全部 Key 最近 100 条快照（fetchedAt 倒序）；
- *   - usageImports：已导入用量的月份列表；
+ *   - credentials：凭证元信息（provider/kind/region/label/hint/isActive/failCount/lastStatus）；
+ *   - snapshots：全部凭证最近 100 条快照（fetchedAt 倒序，金额 Decimal 字符串）；
+ *   - usageImports：已导入用量的月份列表（含 provider）；
  *   - alertSetting：预警设置（若已配置）。
  *
- * 安全红线：全部查询都用 select 字段白名单，结构性排除 ciphertext / iv / authTag /
- * 明文 Key——导出文件不可能包含密文或任何可还原 Key 的字段。
+ * 安全红线：全部查询都用 select 字段白名单，结构性排除 secretCipher / iv / authTag /
+ * 明文凭证——导出文件不可能包含密文或任何可还原凭证的字段。
  */
 import { NextResponse } from "next/server";
 
@@ -27,32 +27,38 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const keys = await db.apiKey.findMany({
+  const credentials = await db.credential.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
+      provider: true,
+      kind: true,
+      region: true,
       label: true,
-      last4: true,
+      hint: true,
       isActive: true,
       failCount: true,
       lastStatus: true,
+      lastSuccessAt: true,
       createdAt: true,
     },
   });
 
   const [snapshots, usageImports, alertSetting] = await Promise.all([
-    keys.length > 0
+    credentials.length > 0
       ? db.balanceSnapshot.findMany({
-          where: { apiKeyId: { in: keys.map((k) => k.id) } },
+          where: { credentialId: { in: credentials.map((c) => c.id) } },
           orderBy: { fetchedAt: "desc" },
           take: SNAPSHOT_EXPORT_LIMIT,
           select: {
             id: true,
+            credentialId: true,
+            provider: true,
+            mode: true,
             currency: true,
-            totalBalance: true,
-            grantedBalance: true,
-            toppedUpBalance: true,
+            available: true,
+            breakdown: true,
             isAvailable: true,
             ok: true,
             fetchedAt: true,
@@ -62,7 +68,7 @@ export async function GET(): Promise<NextResponse> {
     db.usageImport.findMany({
       where: { userId: user.id },
       orderBy: { month: "asc" },
-      select: { month: true, importedAt: true },
+      select: { provider: true, month: true, importedAt: true },
     }),
     db.alertSetting.findUnique({ where: { userId: user.id } }),
   ]);
@@ -70,15 +76,24 @@ export async function GET(): Promise<NextResponse> {
   const payload = {
     exportedAt: new Date().toISOString(),
     user: { id: user.id, email: user.email },
-    keys,
-    snapshots: snapshots.map((s) => ({ ...s, fetchedAt: s.fetchedAt.toISOString() })),
+    credentials: credentials.map((c) => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+      lastSuccessAt: c.lastSuccessAt?.toISOString() ?? null,
+    })),
+    snapshots: snapshots.map((s) => ({
+      ...s,
+      available: s.available.toString(),
+      fetchedAt: s.fetchedAt.toISOString(),
+    })),
     usageImports: usageImports.map((i) => ({
+      provider: i.provider,
       month: i.month,
       importedAt: i.importedAt.toISOString(),
     })),
     alertSetting: alertSetting
       ? {
-          lowBalanceThreshold: alertSetting.lowBalanceThreshold,
+          lowBalanceThreshold: alertSetting.lowBalanceThreshold.toString(),
           failThresholdN: alertSetting.failThresholdN,
           emailEnabled: alertSetting.emailEnabled,
           inappEnabled: alertSetting.inappEnabled,
@@ -90,7 +105,7 @@ export async function GET(): Promise<NextResponse> {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="deepbalance-export-${user.id}.json"`,
+      "Content-Disposition": `attachment; filename="token-wallet-export-${user.id}.json"`,
       "Cache-Control": "no-store",
     },
   });

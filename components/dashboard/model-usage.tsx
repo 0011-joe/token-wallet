@@ -12,9 +12,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { ModelsResponse, ModelUsageRow, UsageType } from "@/lib/api-types";
+import type { ModelsResponse, ModelUsageRow, ProviderId, UsageType } from "@/lib/api-types";
 import { fetchUsageModels } from "@/lib/api-client";
-import { currentMonthUtc, formatAmount, formatMoney, formatNumber } from "@/lib/format";
+import { currentMonthUtc } from "@/lib/format";
+import { formatAmount, formatMoney, formatNumber } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { UsageUpload } from "./usage-upload";
@@ -34,14 +35,14 @@ const OFFICIAL_USAGE_URL = "https://platform.deepseek.com/usage";
  * - 未导入（models:[]）→ 三步导出引导 + 上传区，不影响主看板其余模块；
  * - 已导入 → 模型占比（进度条）+ 明细（byType 展开）；同月重传覆盖。
  */
-export function ModelUsage() {
+export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId }) {
   const queryClient = useQueryClient();
   const [month, setMonth] = useState(currentMonthUtc());
   const maxMonth = currentMonthUtc();
 
   const query = useQuery({
-    queryKey: ["usage", "models", month],
-    queryFn: () => fetchUsageModels(month),
+    queryKey: ["usage", "models", provider, month],
+    queryFn: () => fetchUsageModels(month, provider),
     retry: 0,
   });
 
@@ -96,7 +97,7 @@ export function ModelUsage() {
         ) : null}
 
         {query.data && query.data.models.length === 0 ? (
-          <GuideBlock onImported={invalidateModels} />
+          <GuideBlock onImported={invalidateModels} provider={provider} />
         ) : null}
 
         {query.data && query.data.models.length > 0 ? (
@@ -106,7 +107,7 @@ export function ModelUsage() {
               <p className="text-sm text-muted-foreground">
                 重新导入同月 CSV 会覆盖更新（不翻倍）
               </p>
-              <UsageUpload onImported={invalidateModels} />
+              <UsageUpload onImported={invalidateModels} provider={provider} />
             </div>
           </div>
         ) : null}
@@ -116,7 +117,7 @@ export function ModelUsage() {
 }
 
 /** 未导入引导（AC4-4）：三步导出说明 + 官方链接 + 上传区 */
-function GuideBlock({ onImported }: { onImported: () => void }) {
+function GuideBlock({ onImported, provider }: { onImported: () => void; provider: ProviderId }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
@@ -146,7 +147,7 @@ function GuideBlock({ onImported }: { onImported: () => void }) {
           </li>
         </ol>
       </div>
-      <UsageUpload onImported={onImported} />
+      <UsageUpload onImported={onImported} provider={provider} />
     </div>
   );
 }

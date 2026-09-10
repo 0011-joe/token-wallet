@@ -14,7 +14,7 @@ export default defineConfig({
     // 测试共享一个 Postgres 测试库：测试文件间串行执行，避免数据相互干扰
     fileParallelism: false,
     env: {
-      // 测试连 Postgres 专用库（Neon 项目下另建 deepbalance_test），
+      // 测试连 Postgres 专用库（Neon 项目下另建 token-wallet_test），
       // 防止污染开发/生产数据；未设置 TEST_DATABASE_URL 时不静默降级
       DATABASE_URL: process.env.TEST_DATABASE_URL ?? "",
     },

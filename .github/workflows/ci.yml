@@ -8,6 +8,13 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      # DB 依赖测试需要仓库 Secrets 配置 TEST_DATABASE_URL（指向测试库，勿指向生产）；
+      # 未配置时：迁移步骤跳过并告警，依赖数据库的测试文件以 skipIf 显式跳过。
+      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      AUTH_SECRET: ci-test-auth-secret
+      CRON_SECRET: ci-test-cron-secret
     steps:
       - uses: actions/checkout@v4
 
@@ -28,8 +35,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Apply database migrations (SQLite smoke DB)
-        run: npx prisma migrate deploy
+      - name: Apply database migrations (test DB)
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::TEST_DATABASE_URL secret 未配置：跳过数据库迁移（依赖 DB 的测试将显式 skip）"
+            exit 0
+          fi
+          npx prisma migrate deploy
 
       - name: Test
         run: npm run test

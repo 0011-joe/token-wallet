@@ -12,7 +12,7 @@ export default function Home() {
       />
       <div className="flex flex-col items-center gap-4 text-center">
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-          DeepBalance
+          token-wallet
         </h1>
         <p className="text-lg text-muted-foreground">DeepSeek 用量监控</p>
       </div>
