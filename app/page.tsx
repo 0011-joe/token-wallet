@@ -14,7 +14,7 @@ export default function Home() {
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
           token-wallet
         </h1>
-        <p className="text-lg text-muted-foreground">DeepSeek 用量监控</p>
+        <p className="text-lg text-muted-foreground">多平台 AI 余额钱包 · DeepSeek / Kimi / 豆包</p>
       </div>
       <Link
         href="/login"

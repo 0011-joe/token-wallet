@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "token-wallet",
-  description: "DeepSeek 用量监控",
+  description: "多平台 AI 余额钱包：DeepSeek / Kimi / 豆包（火山引擎）余额与告警",
 };
 
 /**
@@ -35,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   // dark class 由 <head> 内联脚本在 hydration 前写入，因此跳过 <html> 属性一致性检查
   return (
     <html
-      lang="en"
+      lang="zh-CN"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
