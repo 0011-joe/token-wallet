@@ -82,16 +82,34 @@ export interface LegacyBackup {
   snapshots: LegacySnapshotRow[];
 }
 
-/** 备份：读取旧表数据，写入 JSON 文件（退路）。返回文件路径与备份对象。 */
+/** 表是否存在（用于兼容「迁移前（v1 表名）/ 迁移后（*Legacy 表名）」两种状态）。 */
+async function tableExists(db: Prisma.TransactionClient, table: string): Promise<boolean> {
+  const rows = (await db.$queryRawUnsafe(
+    `SELECT to_regclass($1) IS NOT NULL AS exists`,
+    `public."${table}"`
+  )) as Array<{ exists: boolean }>;
+  return rows[0]?.exists === true;
+}
+
+/**
+ * 备份：读取旧表数据，写入 JSON 文件（退路）。
+ * 自动识别表名：迁移前读 v1 表（ApiKey / BalanceSnapshot），迁移后读 *Legacy 表——
+ * 因此可在 `prisma migrate deploy` 之前先跑 `--backup-only`（规格卡 D 第一步）。
+ */
 export async function backupLegacyTables(
   db: Prisma.TransactionClient,
   backupDir: string
 ): Promise<{ file: string; backup: LegacyBackup }> {
+  const keyTable = (await tableExists(db, "ApiKeyLegacy")) ? "ApiKeyLegacy" : "ApiKey";
+  const snapTable = (await tableExists(db, "BalanceSnapshotLegacy"))
+    ? "BalanceSnapshotLegacy"
+    : "BalanceSnapshot";
+
   const apiKeys = (await db.$queryRawUnsafe(
-    `SELECT id, "userId", label, ciphertext, iv, "authTag", last4, "isActive", "failCount", "lastStatus", "createdAt" FROM "ApiKeyLegacy"`
+    `SELECT id, "userId", label, ciphertext, iv, "authTag", last4, "isActive", "failCount", "lastStatus", "createdAt" FROM "${keyTable}"`
   )) as LegacyApiKeyRow[];
   const snapshots = (await db.$queryRawUnsafe(
-    `SELECT id, "apiKeyId", "fetchedAt", currency, "totalBalance", "grantedBalance", "toppedUpBalance", "isAvailable", ok FROM "BalanceSnapshotLegacy"`
+    `SELECT id, "apiKeyId", "fetchedAt", currency, "totalBalance", "grantedBalance", "toppedUpBalance", "isAvailable", ok FROM "${snapTable}"`
   )) as LegacySnapshotRow[];
 
   const backup: LegacyBackup = {

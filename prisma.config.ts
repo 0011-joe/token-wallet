@@ -5,8 +5,12 @@ import path from "node:path";
 import { defineConfig, env } from "prisma/config";
 
 try {
-  process.loadEnvFile(path.resolve(process.cwd(), ".env"));
   process.loadEnvFile(path.resolve(process.cwd(), ".env.local"));
+} catch {
+  // 忽略
+}
+try {
+  process.loadEnvFile(path.resolve(process.cwd(), ".env"));
 } catch {
   // 文件不存在时忽略（生产环境由平台注入 DATABASE_URL）
 }

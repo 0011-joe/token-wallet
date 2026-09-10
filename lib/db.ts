@@ -1,5 +1,20 @@
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+
+// 加载本地 env 文件（与 prisma.config.ts 同法；已存在的环境变量优先，文件不存在时忽略）。
+// 这样 tsx 脚本（迁移/spike）无需额外传参即可拿到 DATABASE_URL；Next/Vercel 运行时由平台注入。
+try {
+  // 先加载 .env.local（本地覆盖优先），再加载 .env 作为默认值补充
+  process.loadEnvFile(path.resolve(process.cwd(), ".env.local"));
+} catch {
+  // 忽略：无 .env.local
+}
+try {
+  process.loadEnvFile(path.resolve(process.cwd(), ".env"));
+} catch {
+  // 忽略：无 .env（生产/CI 由平台注入）
+}
 
 // Prisma 7 必须显式提供 driver adapter；云 Postgres 路线用 PrismaPg。
 const databaseUrl = process.env.DATABASE_URL;

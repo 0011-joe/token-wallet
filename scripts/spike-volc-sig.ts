@@ -9,8 +9,17 @@
  * 输出脱敏：只打印 AccountID 与金额字段，绝不打印 AK/SK/完整响应头。
  * host：billing.volcengineapi.com（官方费用中心文档；open.volcengineapi.com 为调试网关）。
  */
+import path from "node:path";
 import { signVolcRequest } from "../lib/providers/volcengine/sigv4";
 import { toMoney } from "../lib/money";
+
+// 便利：允许把只读 IAM 子用户凭证放在 .env.local（VOLC_AK / VOLC_SK），不必每次设环境变量。
+try {
+  process.loadEnvFile(path.resolve(process.cwd(), ".env"));
+  process.loadEnvFile(path.resolve(process.cwd(), ".env.local"));
+} catch {
+  // 文件不存在时忽略
+}
 
 const HOST = "billing.volcengineapi.com";
 const SERVICE = "billing";

@@ -11,7 +11,7 @@
  * - 对账（行数相等、金额合计误差为 0）不通过即中止并输出差异明细；
  * - 日志只记录行数与结论，绝无凭证明文/密文。
  */
-import { db } from "../lib/db";
+import { db } from "../lib/db"; // lib/db 会自行加载 .env/.env.local
 import {
   backupLegacyTables,
   dropLegacyTables,
