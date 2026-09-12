@@ -44,8 +44,10 @@
 | `AUTH_SECRET` | ✅ | 会话签名（`openssl rand -base64 32`） |
 | `NEXTAUTH_URL` | ✅ | 站点域名 |
 | `ENCRYPTION_KEY` | ✅ | 32 字节 hex（64 字符），凭证加密主密钥，妥善备份 |
-| `CRON_SECRET` | ✅ | 快照端点鉴权，双份：Vercel + GitHub Secrets |
-| `RESEND_API_KEY` / `SMTP_*` | 可选 | 邮件；未配置时仅开发态打印到控制台 |
+| `CRON_SECRET` | ✅ | 快照 + `/api/health` 鉴权，双份：Vercel + GitHub Secrets |
+| `RESEND_API_KEY` / `SMTP_*` | 生产必配其一 | 邮件；未配置时仅开发态打印到控制台。**公网部署必须配置，否则他人无法收到魔法链接**；Resend 免费档请验证自有域名（勿依赖 `onboarding@resend.dev`） |
+| `ALLOWED_EMAILS` | 建议 | 逗号分隔白名单；非空时仅列表内邮箱可登录。公网部署务必配置 |
+| `INVITE_CODES` | 建议 | 逗号分隔邀请码；非空时登录页强制验证邀请码 |
 
 ## 平台凭证获取
 

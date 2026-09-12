@@ -1,9 +1,14 @@
 /**
- * 数据源健康自检端点（NFR 7.3 / T5.4）：结构化脱敏，无鉴权（不含任何凭证信息）。
+ * 数据源健康自检端点（NFR 7.3 / T5.4）：结构化脱敏。
+ *
+ * P0 鉴权：需携带 CRON_SECRET（或 AUTH_SECRET 兜底）——
+ *   Authorization: Bearer <secret>  或  x-health-secret: <secret>
+ * 两者均未配置时：开发态（NODE_ENV !== "production"）放行，生产 503（不静默暴露统计）。
  *
  * GET /api/health → { ok, database, generatedAt, providers: { [provider]: {
  *   credentialCount, okCount, failedCount, staleCount, lastSuccessAt, lastStatuses } } }
  */
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
@@ -14,7 +19,37 @@ export const runtime = "nodejs";
 
 const FAILURE_STATUSES = new Set(["INVALID", "FORBIDDEN_SCOPE", "RATE_LIMITED", "ERROR"]);
 
-export async function GET(): Promise<NextResponse> {
+function secretMatches(provided: string, expected: string): boolean {
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+function authorizeHealth(request: Request): NextResponse | null {
+  const expected = process.env.CRON_SECRET?.trim() || process.env.AUTH_SECRET?.trim();
+  if (!expected) {
+    if (process.env.NODE_ENV !== "production") return null;
+    return NextResponse.json(
+      { ok: false, error: "CRON_SECRET/AUTH_SECRET 未配置：健康检查端点在生产环境拒绝匿名访问" },
+      { status: 503 }
+    );
+  }
+  const provided =
+    request.headers.get("x-health-secret") ??
+    (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!provided || !secretMatches(provided, expected)) {
+    return NextResponse.json(
+      { ok: false, error: "鉴权失败：需要 CRON_SECRET（Authorization: Bearer 或 x-health-secret）" },
+      { status: 401 }
+    );
+  }
+  return null;
+}
+
+export async function GET(request: Request): Promise<NextResponse> {
+  const denied = authorizeHealth(request);
+  if (denied) return denied;
+
   const now = new Date();
   const nowMs = now.getTime();
 

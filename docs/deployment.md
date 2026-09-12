@@ -41,7 +41,9 @@
 | `TEST_DATABASE_URL` | 测试专用库（**仅本地**，Vercel 不配） | 本地 `.env.local` |
 | `AUTH_SECRET` | NextAuth 会话签名 | **密码管理器备份**（Vercel 内不可导出） |
 | `ENCRYPTION_KEY` | API Key AES-256 主密钥，**丢失=已存 Key 永久不可解** | **密码管理器备份**（Vercel 内不可导出） |
-| `CRON_SECRET` | 快照端点鉴权暗号（双份：Vercel + GitHub Secrets） | 密码管理器 + GitHub Secrets |
+| `CRON_SECRET` | 快照端点鉴权暗号（双份：Vercel + GitHub Secrets）；`/api/health` 同密钥 | 密码管理器 + GitHub Secrets |
+| `ALLOWED_EMAILS` | 登录邮箱白名单（逗号分隔；**公网必配**） | Vercel |
+| `INVITE_CODES` | 登录邀请码（逗号分隔；与白名单叠加） | Vercel |
 | `NEXTAUTH_URL` | 回调基址 = `https://<your-domain>` | Vercel |
 | `RESEND_API_KEY` | 邮件发送 | Vercel（Resend 控制台可重新生成） |
 | `SMTP_FROM` | 发件人 `token-wallet <onboarding@resend.dev>` | Vercel |
@@ -103,6 +105,8 @@ npx tsx scripts/migrate-v1-to-v2.ts --drop-legacy   # 观察一个版本周期�
 | 本地 `npm run dev` 起不来 | 检查 `.env.local` 的 `DATABASE_URL`/`TEST_DATABASE_URL`（勿用 `file:` 开头） |
 | 改了代码但生产没变 | 先看 Vercel → Deployments：**部署创建了但状态 ERROR 时，生产会静默继续服务上一个成功构建**，极易误判成"自动部署没触发"。点进 build 日志看具体报错（本例即 4.6 的 `npm install` ERESOLVE） |
 | 本机 cron 端点返回 401 | `.env.local` 的 `CRON_SECRET` 与 Vercel 生产值可能不同（该变量在 Vercel 侧为 sensitive，不可导出查看）；以 GitHub Actions 里那份为准 |
+| `/api/health` 返回 401 | 需携带 `Authorization: Bearer <CRON_SECRET>`（或 `x-health-secret`）；未配置密钥时生产 503 |
+| 别人收不到登录邮件 | ① 是否只配了 Resend 且发件人是 `onboarding@resend.dev`（免费档通常只能发给自己 Resend 账号邮箱）；② 验证自有域名并改 `SMTP_FROM`；③ 是否配置了 `ALLOWED_EMAILS`/`INVITE_CODES` 拦住了对方 |
 
 ## 6. 安全与备份清单
 
