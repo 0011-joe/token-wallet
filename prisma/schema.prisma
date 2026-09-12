@@ -194,3 +194,17 @@ model AlertEvent {
 
   @@index([userId, createdAt])
 }
+
+/// 邮箱登录验证码（OTP）：只存哈希，10 分钟过期，最多试 5 次
+model LoginCode {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@index([expiresAt])
+}

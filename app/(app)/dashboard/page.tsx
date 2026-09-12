@@ -13,6 +13,7 @@ import { OverviewPanel } from "@/components/dashboard/overview-panel";
 import { TrendCard, type RangeValue } from "@/components/dashboard/trend-chart";
 import { BalanceComposition } from "@/components/dashboard/balance-composition";
 import { ModelUsage } from "@/components/dashboard/model-usage";
+import { StaleBanner } from "@/components/dashboard/stale-banner";
 import { fetchCredentials, fetchDashboard, fetchOverview } from "@/lib/api-client";
 import type { DashboardData } from "@/lib/api-types";
 
@@ -80,7 +81,35 @@ function DashboardContent() {
       ) : null}
 
       {credentialId === null && overviewQuery.data ? (
-        <OverviewPanel data={overviewQuery.data.overview} />
+        (() => {
+          const ov = overviewQuery.data.overview;
+          const hasIssue = ov.platforms.some(
+            (p) => p.failedCount > 0 || p.staleCount > 0
+          );
+          const latestSuccessAt =
+            ov.currencies
+              .map((c) => c.latestFetchedAt)
+              .filter((x): x is string => Boolean(x))
+              .sort()
+              .at(-1) ??
+            ov.platforms
+              .map((p) => p.latestFetchedAt)
+              .filter((x): x is string => Boolean(x))
+              .sort()
+              .at(-1) ??
+            null;
+          return (
+            <>
+              <StaleBanner
+                key={ov.generatedAt}
+                hasIssue={hasIssue}
+                latestSuccessAt={latestSuccessAt}
+                signature={ov.generatedAt}
+              />
+              <OverviewPanel data={ov} />
+            </>
+          );
+        })()
       ) : null}
 
       {credentialId === null && overviewQuery.isError ? (

@@ -19,6 +19,7 @@ import { formatAmount, formatMoney, formatNumber } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { UsageUpload } from "./usage-upload";
+import { UsagePullButton } from "./usage-pull-button";
 
 /** type 的用户可读标签（取值全集见 lib/usage/csv-parse.ts） */
 const TYPE_LABELS: Record<UsageType, string> = {
@@ -105,8 +106,9 @@ export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId })
             <ModelsBlock data={query.data} />
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">
-                重新导入同月 CSV 会覆盖更新（不翻倍）
+                重新导入同月 CSV 会覆盖更新（不翻倍）；一键拉取与 CSV 共用同月幂等，互相覆盖
               </p>
+              <UsagePullButton provider={provider} onPulled={invalidateModels} />
               <UsageUpload onImported={invalidateModels} provider={provider} />
             </div>
           </div>
@@ -116,13 +118,13 @@ export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId })
   );
 }
 
-/** 未导入引导（AC4-4）：三步导出说明 + 官方链接 + 上传区 */
+/** 未导入引导（AC4-4）：三步导出说明 + 官方链接 + 上传区 + 一键拉取 */
 function GuideBlock({ onImported, provider }: { onImported: () => void; provider: ProviderId }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
         <p className="text-sm font-medium">
-          查看分模型用量，请先导入官方用量 CSV
+          查看分模型用量，请先导入官方用量 CSV，或使用一键拉取
         </p>
         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
           <li>
@@ -147,6 +149,7 @@ function GuideBlock({ onImported, provider }: { onImported: () => void; provider
           </li>
         </ol>
       </div>
+      <UsagePullButton provider={provider} onPulled={onImported} />
       <UsageUpload onImported={onImported} provider={provider} />
     </div>
   );

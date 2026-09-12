@@ -39,6 +39,6 @@ export function getEmailStatus(env: Record<string, string | undefined> = process
   return {
     configured: false,
     channel: "console",
-    hint: "未配置邮件服务：魔法链接只会打印在服务端控制台，其他邮箱无法登录。生产环境请配置 RESEND_API_KEY（并验证自有域名）或 SMTP。",
+    hint: "未配置邮件服务：登录验证码只会打印在服务端控制台，其他邮箱无法登录。生产环境请配置 RESEND_API_KEY（并验证自有域名）或 SMTP。",
   };
 }

@@ -158,3 +158,44 @@ export function deleteAccount(): Promise<void> {
     body: JSON.stringify({ confirm: true }),
   });
 }
+
+// ── 登录（验证码流；页面也可直接 fetch，此处仅提供类型安全 helper） ──
+
+export interface EmailStatusResponse {
+  email: {
+    configured: boolean;
+    channel: "resend" | "smtp" | "console";
+    hint: string;
+  };
+  inviteRequired: boolean;
+  allowlistEnabled: boolean;
+}
+
+export interface RequestCodeResponse {
+  ok: boolean;
+  /** 开发态（console 渠道）回显给前端的验证码，生产环境不应出现 */
+  devCode?: string;
+}
+
+export function fetchEmailStatus(): Promise<EmailStatusResponse> {
+  return request<EmailStatusResponse>("/api/auth/email-status");
+}
+
+export function verifyInvite(body: {
+  email: string;
+  inviteCode: string;
+}): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("/api/auth/invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function requestCode(body: { email: string }): Promise<RequestCodeResponse> {
+  return request<RequestCodeResponse>("/api/auth/code/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}

@@ -11,7 +11,7 @@
   ↓ HTTPS（Let's Encrypt 自动续签）
 <your-domain>
   └─ Vercel 项目 token-wallet（Next.js 16.3.3, Node runtime）
-       ├─ NextAuth v4 邮箱魔法链接  ──→  Resend 发信（onboarding@resend.dev）
+       ├─ NextAuth v4 邮箱验证码（OTP：6 位 / 10 分钟 / 5 次尝试） ──→  Resend 发信（自有域名发件人）
        ├─ Prisma 7 + @prisma/adapter-pg
        │    └─ Neon Postgres（ap-southeast-1 新加坡，pooled 连接）
        └─ /api/cron/snapshot（x-cron-secret 鉴权）
@@ -20,6 +20,8 @@
 ```
 
 成本：Vercel / Neon / Resend 均为免费档（hobby / free / 100封每天）；域名 `<your-domain>` 由阿里云注册（约 ¥30~40/年，**建议开自动续费**）。
+
+> 发件域名、验证码/预警邮件模板与 Resend 验证步骤见 [onboarding-email.md](onboarding-email.md)。
 
 ## 2. 入口一览
 
@@ -35,6 +37,8 @@
 
 ## 3. 环境变量总账（Vercel → Settings → Environment Variables，全部 production）
 
+> 仓库 `.gitignore` 为 `.env*`，**`.env.example` 不会入库**；以本表与 README「环境变量」为准。
+
 | 变量 | 用途 | 值在哪 |
 |---|---|---|
 | `DATABASE_URL` | Neon **pooled** 主库连接串 | Neon 控制台复制；本地 `.env.local` 同值 |
@@ -45,8 +49,9 @@
 | `ALLOWED_EMAILS` | 登录邮箱白名单（逗号分隔；**公网必配**） | Vercel |
 | `INVITE_CODES` | 登录邀请码（逗号分隔；与白名单叠加） | Vercel |
 | `NEXTAUTH_URL` | 回调基址 = `https://<your-domain>` | Vercel |
-| `RESEND_API_KEY` | 邮件发送 | Vercel（Resend 控制台可重新生成） |
-| `SMTP_FROM` | 发件人 `token-wallet <onboarding@resend.dev>` | Vercel |
+| `APP_URL` | 站点绝对地址（Actions 快照、服务端埋点拼 URL） | Vercel + GitHub repository variables |
+| `RESEND_API_KEY` | 邮件发送（**须已验证自有域名**） | Vercel（Resend 控制台可重新生成） |
+| `SMTP_FROM` | 发件人 `token-wallet <noreply@<your-domain>>`，**必须自有域名**；勿用 `onboarding@resend.dev` | Vercel |
 | `DEEPSEEK_BASE_URL` | 未配置时用官方默认 `https://api.deepseek.com` | 可不配 |
 
 ## 4. 日常操作
@@ -98,19 +103,21 @@ npx tsx scripts/migrate-v1-to-v2.ts --drop-legacy   # 观察一个版本周期�
 | 现象 | 排查 |
 |---|---|
 | 手机打不开站点 | ① 域名是否续费/过期（阿里云）；② `nslookup <your-domain>` 是否指向 `76.76.21.21`；③ Vercel 项目域名状态 |
-| 邮件没收到 | ① Resend 控制台 Logs 看发送是否成功；② 发件人必须是 `onboarding@resend.dev`（未验证域名时）；③ 垃圾箱 |
-| 点击链接报 token 无效 | 链接一次性：30 分钟内未用会过期；重新发送一次 |
+| 验证码邮件没收到 | ① Resend 控制台 Logs 看发送是否成功；② 发件人必须是已验证自有域名（`onboarding@resend.dev` 免费档通常只能发给自己 Resend 账号邮箱）；③ 垃圾箱 |
+| 验证码提示无效/已过期 | 验证码 10 分钟有效、最多试 5 次；超限或过期后点「重新发送」获取新码 |
 | 快照没数据 | GitHub Actions 该 cron 运行日志；或手动 curl 4.3；看 Vercel 函数日志 |
+| 仪表盘提示数据陈旧 | 最近成功快照超过约 90 分钟会被标 stale，界面会显著提示「数据截至 xx:xx」；先查 cron 是否正常（上一行） |
 | 页面冷启动慢（3~10s） | 免费档函数休眠，正常现象，可用后即秒开 |
 | 本地 `npm run dev` 起不来 | 检查 `.env.local` 的 `DATABASE_URL`/`TEST_DATABASE_URL`（勿用 `file:` 开头） |
 | 改了代码但生产没变 | 先看 Vercel → Deployments：**部署创建了但状态 ERROR 时，生产会静默继续服务上一个成功构建**，极易误判成"自动部署没触发"。点进 build 日志看具体报错（本例即 4.6 的 `npm install` ERESOLVE） |
 | 本机 cron 端点返回 401 | `.env.local` 的 `CRON_SECRET` 与 Vercel 生产值可能不同（该变量在 Vercel 侧为 sensitive，不可导出查看）；以 GitHub Actions 里那份为准 |
 | `/api/health` 返回 401 | 需携带 `Authorization: Bearer <CRON_SECRET>`（或 `x-health-secret`）；未配置密钥时生产 503 |
-| 别人收不到登录邮件 | ① 是否只配了 Resend 且发件人是 `onboarding@resend.dev`（免费档通常只能发给自己 Resend 账号邮箱）；② 验证自有域名并改 `SMTP_FROM`；③ 是否配置了 `ALLOWED_EMAILS`/`INVITE_CODES` 拦住了对方 |
+| 别人收不到登录邮件 | ① 是否只配了 Resend 且发件人是 `onboarding@resend.dev`（免费档通常只能发给自己 Resend 账号邮箱）；② **必须**验证自有域名并改 `SMTP_FROM`；③ 是否配置了 `ALLOWED_EMAILS`/`INVITE_CODES` 拦住了对方 |
 
 ## 6. 安全与备份清单
 
 - [ ] `ENCRYPTION_KEY`、`AUTH_SECRET`、`CRON_SECRET` 已存密码管理器（Vercel 内不可导出）
 - [ ] 阿里云开启域名自动续费
-- [ ] （可选升级）Resend 验证 `<your-domain>` 域名后，`SMTP_FROM` 换 `noreply@<your-domain>`
+- [ ] Resend 已验证 `<your-domain>` 域名，`SMTP_FROM` 使用 `noreply@<your-domain>`（**公网上线必做**，勿停留在 `onboarding@resend.dev`）
+- [ ] `ALLOWED_EMAILS` / `INVITE_CODES` 已按需配置（公网登录准入）
 - [ ] 密钥轮换：改 `ENCRYPTION_KEY` 会使已存 API Key 全部失效（需重新录入），非必要不动

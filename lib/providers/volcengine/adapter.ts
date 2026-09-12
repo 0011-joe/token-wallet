@@ -23,10 +23,11 @@ import type {
   TestResult,
 } from "../types";
 
-const VOLC_HOST = "billing.volcengineapi.com";
-const VOLC_SERVICE = "billing";
-const VOLC_REGION = "cn-beijing";
-const DEFAULT_TIMEOUT_MS = 10_000;
+/** 费用中心 OpenAPI 端点常量（usage.ts 复用，勿在此处改余额路径） */
+export const VOLC_HOST = "billing.volcengineapi.com";
+export const VOLC_SERVICE = "billing";
+export const VOLC_REGION = "cn-beijing";
+export const DEFAULT_TIMEOUT_MS = 10_000;
 
 interface VolcBalanceResult {
   AccountID?: number | string;
@@ -48,8 +49,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-/** 官方错误码 → 统一错误模型（AC2.2：签名错/权限不足可区分） */
-function classifyVolcError(code: string | undefined, message: string | undefined) {
+/** 官方错误码 → 统一错误模型（AC2.2：签名错/权限不足可区分）；usage.ts 复用 */
+export function classifyVolcError(code: string | undefined, message: string | undefined) {
   if (code === "SignatureDoesNotMatch" || code === "100010") {
     return { reason: "INVALID" as const, message: message ?? "签名不匹配（检查 AK/SK 与时钟）" };
   }

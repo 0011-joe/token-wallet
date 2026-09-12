@@ -94,12 +94,26 @@ export function clientIpFromRequest(request: Request): string {
 export const EMAIL_SIGNIN_LIMIT = 5;
 export const IP_SIGNIN_LIMIT = 20;
 export const IP_INVITE_LIMIT = 20;
+/** 发验证码：邮箱更严（防刷邮件配额） */
+export const EMAIL_OTP_LIMIT = 3;
+export const IP_OTP_LIMIT = 10;
 
 export function checkEmailSignInLimit(email: string): RateLimitResult {
   return hitRateLimit({
     key: `signin:email:${email.trim().toLowerCase()}`,
     limit: EMAIL_SIGNIN_LIMIT,
   });
+}
+
+export function checkEmailOtpLimit(email: string): RateLimitResult {
+  return hitRateLimit({
+    key: `otp:email:${email.trim().toLowerCase()}`,
+    limit: EMAIL_OTP_LIMIT,
+  });
+}
+
+export function checkIpOtpLimit(ip: string): RateLimitResult {
+  return hitRateLimit({ key: `otp:ip:${ip}`, limit: IP_OTP_LIMIT });
 }
 
 export function checkIpSignInLimit(ip: string): RateLimitResult {

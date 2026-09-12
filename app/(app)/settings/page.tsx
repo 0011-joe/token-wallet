@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmailOnboarding } from "@/components/settings/email-onboarding";
 import { cn } from "@/lib/utils";
 
 interface AlertSettings {
@@ -379,6 +380,9 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </section>
+
+          {/* ── 邮件与发信（P0 配置引导） ── */}
+          <EmailOnboarding />
 
           {/* ── 账户设置 ── */}
           <section aria-label="账户设置">
