@@ -33,11 +33,19 @@ const OFFICIAL_USAGE_URL = "https://platform.deepseek.com/usage";
 
 /**
  * 分模型 Token 用量区（FR-4 / AC4-4）：
- * - 未导入（models:[]）→ 三步导出引导 + 上传区，不影响主看板其余模块；
- * - 已导入 → 模型占比（进度条）+ 明细（byType 展开）；同月重传覆盖。
+ * - 平台切换：DeepSeek（官方 CSV 精确）/ Kimi·豆包（一键拉取估算）
+ * - 未导入（models:[]）→ 引导 + 上传/拉取区，不影响主看板其余模块；
+ * - 已导入 → 模型占比（进度条）+ 明细（byType 展开）；同月重传/拉取覆盖。
  */
-export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId }) {
+const USAGE_PROVIDERS: Array<{ id: ProviderId; label: string }> = [
+  { id: "deepseek", label: "DeepSeek" },
+  { id: "kimi", label: "Kimi" },
+  { id: "volcengine", label: "豆包" },
+];
+
+export function ModelUsage({ provider: initialProvider = "deepseek" }: { provider?: ProviderId }) {
   const queryClient = useQueryClient();
+  const [provider, setProvider] = useState<ProviderId>(initialProvider);
   const [month, setMonth] = useState(currentMonthUtc());
   const maxMonth = currentMonthUtc();
 
@@ -51,27 +59,59 @@ export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId })
     void queryClient.invalidateQueries({ queryKey: ["usage", "models"] });
   }
 
+  const isEstimateSource = provider !== "deepseek";
+
   return (
     <Card className="flex flex-col">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center justify-between gap-3">
           <span className="flex items-center gap-2">分模型 Token 用量</span>
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="text-xs">查看月份</span>
-            <input
-              type="month"
-              value={month}
-              max={maxMonth}
-              aria-label="选择查看月份"
-              onChange={(e) => {
-                if (e.target.value) setMonth(e.target.value);
-              }}
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            />
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="tablist"
+              aria-label="用量平台"
+              className="inline-flex rounded-lg border border-border p-0.5"
+            >
+              {USAGE_PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={provider === p.id}
+                  onClick={() => {
+                    if (provider === p.id) return;
+                    setProvider(p.id);
+                  }}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    provider === p.id
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="text-xs">查看月份</span>
+              <input
+                type="month"
+                value={month}
+                max={maxMonth}
+                aria-label="选择查看月份"
+                onChange={(e) => {
+                  if (e.target.value) setMonth(e.target.value);
+                }}
+                className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              />
+            </label>
+          </div>
         </CardTitle>
         <CardDescription>
-          来自官方用量 CSV 的精确数据（与上方消耗估算口径不同）
+          {isEstimateSource
+            ? "Kimi / 豆包：余额快照差值估算（非官方账单）；与上方消耗估算同口径"
+            : "来自官方用量 CSV 的精确数据（与上方消耗估算口径不同）"}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -107,6 +147,7 @@ export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId })
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">
                 重新导入同月 CSV 会覆盖更新（不翻倍）；一键拉取与 CSV 共用同月幂等，互相覆盖
+                {isEstimateSource ? "。估算结果请以平台控制台账单为准" : ""}
               </p>
               <UsagePullButton provider={provider} onPulled={invalidateModels} />
               <UsageUpload onImported={invalidateModels} provider={provider} />
@@ -118,36 +159,56 @@ export function ModelUsage({ provider = "deepseek" }: { provider?: ProviderId })
   );
 }
 
-/** 未导入引导（AC4-4）：三步导出说明 + 官方链接 + 上传区 + 一键拉取 */
-function GuideBlock({ onImported, provider }: { onImported: () => void; provider: ProviderId }) {
+/** 未导入引导（AC4-4）：按平台给出 CSV / 一键拉取路径 */
+function GuideBlock({
+  onImported,
+  provider,
+}: {
+  onImported: () => void;
+  provider: ProviderId;
+}) {
+  const isDeepseek = provider === "deepseek";
+  const platformLabel = provider === "kimi" ? "Kimi" : provider === "volcengine" ? "豆包（火山引擎）" : "DeepSeek";
+
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
         <p className="text-sm font-medium">
-          查看分模型用量，请先导入官方用量 CSV，或使用一键拉取
+          {isDeepseek
+            ? "查看分模型用量，请先导入官方用量 CSV，或使用一键拉取"
+            : `查看 ${platformLabel} 用量，请使用一键拉取（余额差值估算）`}
         </p>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
-          <li>
-            登录
-            <a
-              href={OFFICIAL_USAGE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="mx-1 text-primary underline underline-offset-4 hover:opacity-80"
-            >
-              DeepSeek 开放平台「用量信息」
-            </a>
-            页面
-          </li>
-          <li>选择月份并点击「导出」，下载并解压压缩包</li>
-          <li>
-            将其中{" "}
-            <code className="rounded-md bg-muted px-1 py-0.5 font-mono text-xs">
-              amount
-            </code>{" "}
-            文件的 CSV 拖入下方上传区（重复上传会覆盖当月数据）
-          </li>
-        </ol>
+        {isDeepseek ? (
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
+            <li>
+              登录
+              <a
+                href={OFFICIAL_USAGE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="mx-1 text-primary underline underline-offset-4 hover:opacity-80"
+              >
+                DeepSeek 开放平台「用量信息」
+              </a>
+              页面
+            </li>
+            <li>选择月份并点击「导出」，下载并解压压缩包</li>
+            <li>
+              将其中{" "}
+              <code className="rounded-md bg-muted px-1 py-0.5 font-mono text-xs">
+                amount
+              </code>{" "}
+              文件的 CSV 拖入下方上传区（重复上传会覆盖当月数据）
+            </li>
+          </ol>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            官方未开放模型 Key 用量明细 API，或本仓库未确认字段映射。
+            一键拉取会基于余额快照差值给出
+            <span className="mx-1 font-medium text-foreground">估算</span>
+            消耗（非官方账单）。需先绑定该平台凭证并完成至少 2 次成功余额快照。
+          </p>
+        )}
       </div>
       <UsagePullButton provider={provider} onPulled={onImported} />
       <UsageUpload onImported={onImported} provider={provider} />

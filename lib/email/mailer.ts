@@ -1,10 +1,10 @@
 /**
- * 统一邮件发送器：M6 预警邮件（send.ts）与 Auth.js 魔法链接邮件（verification-request.ts）
+ * 统一邮件发送器：预警邮件（send.ts）与登录验证码（otp-mail.ts）
  * 共用同一渠道配置与优先级：
  *   1. RESEND_API_KEY 已配置 → resend SDK（`new Resend(key).emails.send`）；
  *   2. 否则 SMTP_HOST/SMTP_USER/SMTP_PASS 已配置 → nodemailer（动态导入，仅 SMTP 路径加载）；
  *   3. 都未配置 → 返回 channel="unconfigured" 错误，由调用方决定开发态行为
- *      （sendAlertEmail 降级控制台预览；auth.ts 的"未配置"分支保持打印链接）。
+ *      （sendAlertEmail 降级控制台预览；OTP 发码端点生产直接 503）。
  *
  * SMTP 安全参数规则：SMTP_SECURE 显式设置时以其为准；未设置时按端口自动判定——
  * 端口 465 → secure=true（立即 TLS 直连），其余（常见 587）→ secure=false（STARTTLS 升级）。

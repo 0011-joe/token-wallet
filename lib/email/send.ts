@@ -22,7 +22,7 @@ export interface AlertEmailInput {
 
 export type SendAlertEmailResult = { ok: true } | { ok: false; error: string };
 
-/** 开发态预览：邮件内容打印到服务端控制台（与 auth.ts 魔法链接开发态一致）。 */
+/** 开发态预览：邮件内容打印到服务端控制台（与 OTP 发码开发态约定一致）。 */
 function logPreview(input: AlertEmailInput): void {
   console.log(
     `[alerts:email-dev] 邮件预览 to=${input.to} subject=${input.subject}\n${input.html}`

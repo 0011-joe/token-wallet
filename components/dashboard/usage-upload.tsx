@@ -69,8 +69,10 @@ export function UsageUpload({
   if (provider !== "deepseek") {
     return (
       <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-        {provider === "kimi" ? "Kimi" : "豆包（火山引擎）"} 用量导入即将支持（v2.0 暂仅支持
-        DeepSeek）。余额监控不受影响。
+        {provider === "kimi" ? "Kimi" : "豆包（火山引擎）"}
+        暂无官方用量 CSV 导入。可先用上方「一键拉取用量」做余额差值
+        <span className="mx-1 font-medium text-foreground">估算</span>
+        （非官方账单）；精确明细请到对应平台控制台查看。
       </div>
     );
   }

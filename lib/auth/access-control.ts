@@ -2,10 +2,10 @@
  * 登录准入（P0）：邮箱白名单 + 邀请码。
  *
  * 环境变量：
- * - ALLOWED_EMAILS：逗号分隔邮箱列表。非空时，仅列表内邮箱可请求魔法链接（大小写不敏感）。
+ * - ALLOWED_EMAILS：逗号分隔邮箱列表。非空时，仅列表内邮箱可请求登录验证码（大小写不敏感）。
  *   为空 = 不启用白名单（兼容既有单人部署）。
  * - INVITE_CODES：逗号分隔邀请码。非空时，请求登录前必须先通过 POST /api/auth/invite
- *   换取短时 HttpOnly Cookie（见 COOKIE），sendVerificationRequest 会校验该 Cookie。
+ *   换取短时 HttpOnly Cookie（见 COOKIE），发码端点会校验该 Cookie。
  *   为空 = 不启用邀请码。
  *
  * Cookie 设计（防伪造）：
@@ -116,7 +116,7 @@ export type AccessDecision =
   | { ok: false; status: 401 | 403 | 429; error: string };
 
 /**
- * 请求魔法链接前的准入判定（白名单 + 邀请 Cookie）。
+ * 请求登录验证码前的准入判定（白名单 + 邀请 Cookie）。
  * 限流在调用方（rate-limit）单独检查，便于分别返回 429 与文案。
  */
 export function evaluateSignInAccess(opts: {

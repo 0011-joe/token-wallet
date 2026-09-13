@@ -1,11 +1,11 @@
 /**
- * lib/email 邮件发送测试（M6 预警邮件 sendAlertEmail + Auth.js 魔法链接邮件）。
+ * lib/email 邮件发送测试（预警邮件 sendAlertEmail + OTP 邮件通道）。
  *
  * 策略：mails 模块在用例内用 vi.doMock + vi.resetModules 后动态 import，
  * 隔离各渠道 mock；process.env 在 beforeEach 清空、afterEach 还原，
  * 避免污染其他测试文件。
  *
- * 红线：不以任何形式打印真实魔法链接 URL / API Key 明文；
+ * 红线：不以任何形式打印验证码 / API Key 明文；
  * 断言仅覆盖 mock 调用参数与测试内自造的假数据。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,7 +49,6 @@ afterEach(() => {
 const resendSendMock = vi.fn();
 const createTransportMock = vi.fn();
 const transportSendMailMock = vi.fn();
-const mailerSendMailMock = vi.fn();
 
 describe("M6 预警邮件 sendAlertEmail（lib/email/send.ts）", () => {
   it("RESEND_API_KEY 配置 → 走 resend SDK，发送参数（to/subject/html）不含 Key 明文", async () => {
@@ -227,65 +226,5 @@ describe("M6 预警邮件 sendAlertEmail（lib/email/send.ts）", () => {
     expect(result).toEqual({ ok: true });
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(logSpy.mock.calls[0][0]).toContain("邮件预览");
-  });
-});
-
-describe("魔法链接邮件 sendVerificationRequestEmail（lib/email/verification-request.ts）", () => {
-  it("mock mailer：to=identifier、正文含链接（HTML 转义后），且无任何 console 输出", async () => {
-    // 测试内自造的假链接（非真实 token），仅用于断言 mock 调用参数
-    const fakeUrl =
-      "http://localhost:3000/api/auth/callback/email?token=fake-token-abc123&email=user@example.com";
-    vi.doMock("@/lib/email/mailer", async (importOriginal) => {
-      const actual = await importOriginal<typeof import("@/lib/email/mailer")>();
-      return { ...actual, sendMail: mailerSendMailMock };
-    });
-    mailerSendMailMock.mockResolvedValue({ ok: true });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.resetModules();
-
-    const { sendVerificationRequestEmail } = await import(
-      "@/lib/email/verification-request"
-    );
-    const result = await sendVerificationRequestEmail("user@example.com", fakeUrl);
-
-    expect(result).toEqual({ ok: true });
-    expect(mailerSendMailMock).toHaveBeenCalledTimes(1);
-    const arg = mailerSendMailMock.mock.calls[0][0];
-    expect(arg.to).toBe("user@example.com");
-    expect(arg.subject).toBe("token-wallet 登录链接");
-    expect(arg.html).toContain("登录 token-wallet");
-    // 链接以 HTML 转义形式嵌入（& → &amp;），token 值本身原样保留
-    expect(arg.html).toContain(fakeUrl.replace(/&/g, "&amp;"));
-    expect(arg.html).toContain("fake-token-abc123");
-    // 红线：mock 发送期间不得打印链接/正文
-    expect(logSpy).not.toHaveBeenCalled();
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
-
-  it("mailer 返回未配置 → ok:false（错误信息不含 url）", async () => {
-    const fakeUrl =
-      "http://localhost:3000/api/auth/callback/email?token=fake-token-xyz";
-    vi.doMock("@/lib/email/mailer", async (importOriginal) => {
-      const actual = await importOriginal<typeof import("@/lib/email/mailer")>();
-      return { ...actual, sendMail: mailerSendMailMock };
-    });
-    mailerSendMailMock.mockResolvedValue({
-      ok: false,
-      channel: "unconfigured" as const,
-      error: "未配置邮件渠道（RESEND_API_KEY 或 SMTP_HOST/USER/PASS）",
-    });
-    vi.resetModules();
-
-    const { sendVerificationRequestEmail } = await import(
-      "@/lib/email/verification-request"
-    );
-    const result = await sendVerificationRequestEmail("user@example.com", fakeUrl);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("未配置");
-      expect(result.error).not.toContain(fakeUrl);
-    }
   });
 });
