@@ -30,13 +30,17 @@
 
 > **用量口径说明**：DeepSeek 用量来自官方 CSV，可视为精确；Kimi / 豆包（火山引擎）用量受平台接口能力限制，展示值可能为余额快照差值等估算口径，**不能等同于官方账单**，请以各平台控制台账单为准。
 
-## 快速开始（Vercel + Neon，约 30 分钟）
+## 快速开始（Vercel + Neon，约 5–10 分钟）
 
-1. **准备数据库**：在 [Neon](https://neon.tech) 创建一个 Postgres 项目，复制 **pooled** 连接串（含 `-pooler` 主机与 `?sslmode=require`）。
-2. **部署到 Vercel**：Fork 本仓库 → Vercel 导入该仓库 → 配置环境变量（见下）→ Deploy。
-3. **初始化数据库**：运行 `npx prisma migrate deploy`（或 Vercel build 已含 `prisma generate`，迁移由 CI 或手动执行）。
-4. **配置定时任务**：GitHub 仓库 Settings → Actions secrets 添加 `CRON_SECRET`、variables 添加 `APP_URL`（生产地址）；`.github/workflows/snapshot.yml` 每小时触发，Vercel Cron 每日兜底。
-5. 打开站点 → 输入邮箱接收 **6 位验证码**登录（见下）→ 添加平台凭证，即可看到首份余额。
+站内也有 `/setup` 向导页，三步对照勾选。
+
+1. **准备数据库**：在 [Neon](https://neon.tech) 创建 Postgres，复制 **pooled** 连接串（`-pooler` + `?sslmode=require`）。
+2. **部署到 Vercel**：Fork → 导入仓库 → 配置环境变量（见下，至少 `DATABASE_URL` / `AUTH_SECRET` / `ENCRYPTION_KEY` / `NEXTAUTH_URL` / `CRON_SECRET` + 发信）→ Deploy。
+3. **初始化数据库**：`npx prisma migrate deploy`（Vercel build 已含 `prisma generate`）。
+4. **价格种子（可选）**：`npx tsx scripts/pricing-apply.ts` 写入官方 DeepSeek 价与峰谷窗口（需先 `prisma generate`）。
+5. **定时任务**：GitHub Secrets `CRON_SECRET` + Variables `APP_URL`；打开站点 → **6 位验证码**登录 → 添加平台凭证。
+
+> 发信未配置时，生产环境验证码接口会返回 503，请先配好 Resend（验证自有域名）或 SMTP。
 
 ### 登录方式（邮箱验证码 OTP）
 
