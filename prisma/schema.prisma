@@ -208,3 +208,135 @@ model LoginCode {
   @@index([email, createdAt])
   @@index([expiresAt])
 }
+
+// ── v2.1-alpha：计价 / 用量事实 / 预算 / 采集设备 ──
+
+enum UsageSource {
+  csv_official
+  host_measured
+  derived_estimate
+}
+
+/// 单价（每 1M token）；只追加不修改（D8）
+model Price {
+  id            String   @id @default(cuid())
+  provider      String
+  model         String
+  effectiveFrom DateTime
+  currency      String
+  input         Decimal  @db.Decimal(18, 9)
+  output        Decimal  @db.Decimal(18, 9)
+  cacheHit      Decimal? @db.Decimal(18, 9)
+  cacheMiss     Decimal? @db.Decimal(18, 9)
+  reasoning     Decimal? @db.Decimal(18, 9)
+  sourceUrl     String
+  checkedAt     DateTime
+  note          String?
+
+  @@unique([provider, model, effectiveFrom, currency])
+  @@index([provider, model, effectiveFrom])
+}
+
+/// 峰谷窗口；倍率相对 Price 基价（空闲价）
+model PriceWindow {
+  id            String   @id @default(cuid())
+  provider      String
+  label         String
+  effectiveFrom DateTime
+  weekdayMask   Int
+  startMinute   Int
+  endMinute     Int
+  tz            String   @default("Asia/Shanghai")
+  multiplier    Decimal  @db.Decimal(6, 3)
+  sourceUrl     String
+  checkedAt     DateTime
+
+  @@index([provider, effectiveFrom])
+}
+
+/// 日粒度用量事实（精度标签强制）
+model UsageDaily {
+  id              String      @id @default(cuid())
+  userId          String
+  provider        String
+  model           String
+  date            DateTime    @db.Date
+  tz              String      @default("Asia/Shanghai")
+  source          UsageSource
+  inputTokens     BigInt      @default(0)
+  outputTokens    BigInt      @default(0)
+  cacheHitTokens  BigInt      @default(0)
+  cacheMissTokens BigInt      @default(0)
+  reasoningTokens BigInt      @default(0)
+  requests        Int         @default(0)
+  cost            Decimal?    @db.Decimal(18, 9)
+  costComplete    Boolean     @default(false)
+  currency        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([userId, provider, model, date, source])
+  @@index([userId, date])
+  @@index([userId, provider, date])
+}
+
+/// 采集设备（每设备独立 key，可吊销）
+model IngestDevice {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  keyHash    String
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// ingest 幂等/防重放审计
+model UsageIngest {
+  id          String    @id @default(cuid())
+  userId      String
+  deviceId    String?
+  nonce       String    @unique
+  source      String
+  receivedAt  DateTime  @default(now())
+  payloadHash String
+  batchCount  Int
+  accepted    Int
+  rejected    Int
+
+  @@index([userId, receivedAt])
+}
+
+enum BudgetPeriod {
+  day
+  month
+  custom
+}
+
+enum BudgetScope {
+  global
+  provider
+  modelPattern
+}
+
+model Budget {
+  id              String       @id @default(cuid())
+  userId          String
+  scope           BudgetScope  @default(global)
+  provider        String?
+  modelPattern    String?
+  period          BudgetPeriod @default(month)
+  windowStart     DateTime?
+  windowEnd       DateTime?
+  amount          Decimal      @db.Decimal(18, 6)
+  currency        String
+  warnPct         Int          @default(80)
+  criticalPct     Int          @default(100)
+  runwayAlertDays Int?         @default(3)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  @@index([userId, isActive])
+}
