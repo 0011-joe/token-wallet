@@ -14,6 +14,7 @@ import { TrendCard, type RangeValue } from "@/components/dashboard/trend-chart";
 import { BalanceComposition } from "@/components/dashboard/balance-composition";
 import { ModelUsage } from "@/components/dashboard/model-usage";
 import { StaleBanner } from "@/components/dashboard/stale-banner";
+import { ReconcileCard } from "@/components/dashboard/reconcile-card";
 import {
   fetchCredentials,
   fetchDashboard,
@@ -241,10 +242,14 @@ function Dashboard({
 
       {/* 第二屏：余额构成（右 1/3）+ 分模型 Token 用量（左 2/3） */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 flex flex-col gap-4">
           <ModelUsage
             provider={data.credential.provider}
             credentialId={data.credential.id}
+          />
+          <ReconcileCard
+            month={new Date().toISOString().slice(0, 7)}
+            provider={data.credential.provider}
           />
         </div>
         <BalanceComposition balance={data.balance} />
