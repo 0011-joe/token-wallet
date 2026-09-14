@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmailOnboarding } from "@/components/settings/email-onboarding";
+import { BudgetSettings } from "@/components/settings/budget-settings";
 import { cn } from "@/lib/utils";
 
 interface AlertSettings {
@@ -383,6 +384,9 @@ export default function SettingsPage() {
 
           {/* ── 邮件与发信（P0 配置引导） ── */}
           <EmailOnboarding />
+
+          {/* ── 预算（M11） ── */}
+          <BudgetSettings />
 
           {/* ── 账户设置 ── */}
           <section aria-label="账户设置">
