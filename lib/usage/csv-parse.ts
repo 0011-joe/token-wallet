@@ -58,6 +58,8 @@ export interface ParsedUsageRow {
   amount: number;
   /** price × amount；request_count 为 0 */
   cost: number;
+  /** 事件日（YYYY-MM-DD，取 start_time_iso），供 UsageDaily 双写 */
+  startDate?: string;
 }
 
 export interface ParsedUsage {
@@ -197,6 +199,7 @@ export function parseUsageCsv(csvText: string): ParsedUsage {
       unitPrice: price,
       amount,
       cost: (price ?? 0) * amount,
+      startDate: String(raw.start_time_iso ?? "").trim().slice(0, 10),
     };
   });
 

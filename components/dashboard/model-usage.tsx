@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 import { UsageUpload } from "./usage-upload";
 import { UsagePullButton } from "./usage-pull-button";
+import { SourceBadge } from "./source-badge";
 
 /** type 的用户可读标签（取值全集见 lib/usage/csv-parse.ts） */
 const TYPE_LABELS: Record<UsageType, string> = {
@@ -154,7 +155,10 @@ export function ModelUsage({
 
         {query.data && query.data.models.length > 0 ? (
           <div className="flex flex-col gap-5">
-            <ModelsBlock data={query.data} />
+            <ModelsBlock
+              data={query.data}
+              source={isEstimateSource ? "derived_estimate" : "csv_official"}
+            />
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">
                 重新导入同月 CSV 会覆盖更新（不翻倍）；一键拉取与 CSV 共用同月幂等，互相覆盖
@@ -242,7 +246,13 @@ function GuideBlock({
 }
 
 /** 已导入：占比排行（进度条）+ 明细表格（byType 展开行） */
-function ModelsBlock({ data }: { data: ModelsResponse }) {
+function ModelsBlock({
+  data,
+  source,
+}: {
+  data: ModelsResponse;
+  source?: "csv_official" | "host_measured" | "derived_estimate";
+}) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
@@ -251,6 +261,7 @@ function ModelsBlock({ data }: { data: ModelsResponse }) {
         <span className="font-medium">
           {data.month} 共 {data.models.length} 个模型
         </span>
+        {source ? <SourceBadge source={source} /> : null}
         <span className="text-muted-foreground">
           合计费用{" "}
           {data.currency

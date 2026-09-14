@@ -18,6 +18,7 @@ import { authOptions } from "@/auth";
 import { db } from "@/lib/db";
 import { CsvParseError, parseCostCsv, parseUsageCsv, type ParsedCost } from "@/lib/usage/csv-parse";
 import { upsertUsageImport } from "@/lib/usage/import-store";
+import { dualWriteUsageDaily } from "@/lib/usage/daily-dual-write";
 import type { ProviderId } from "@/lib/providers/types";
 import { requireUserId } from "@/lib/usage/require-user";
 
@@ -143,8 +144,8 @@ export async function POST(request: Request): Promise<Response> {
   const fileName = path.basename(file.name) || "usage.csv";
 
   try {
-    const result = await db.$transaction((tx) =>
-      upsertUsageImport(
+    const result = await db.$transaction(async (tx) => {
+      const imp = await upsertUsageImport(
         tx,
         userId,
         "deepseek" as ProviderId,
@@ -152,13 +153,23 @@ export async function POST(request: Request): Promise<Response> {
         fileName,
         parsed.rows,
         cost?.currency ?? null
-      )
-    );
+      );
+      // 红线 15：同一解析结果双写 UsageDaily（csv_official）
+      const daily = await dualWriteUsageDaily(tx, {
+        userId,
+        provider: "deepseek",
+        month: parsed.month,
+        rows: parsed.rows,
+        currency: cost?.currency ?? null,
+      });
+      return { ...imp, dailyRows: daily.rowCount };
+    });
     const modelCount = new Set(parsed.rows.map((r) => r.model)).size;
     return NextResponse.json({
       month: parsed.month,
       rows: result.rowCount,
       models: modelCount,
+      dailyRows: result.dailyRows,
     });
   } catch (err) {
     console.error("[api/usage/import] 入库失败", err);
