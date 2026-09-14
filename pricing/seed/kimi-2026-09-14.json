@@ -1,0 +1,58 @@
+{
+  "asOf": "2026-09-14",
+  "sourceUrl": "https://platform.moonshot.cn/docs/pricing/chat",
+  "sourceUrlAlt": "https://platform.kimi.com/docs/pricing/chat.md",
+  "checkedAt": "2026-09-14T00:00:00.000Z",
+  "note": "CNY 每 1M token；Kimi 无峰谷倍率，PriceWindow 不建。字段：cacheHit=缓存命中，input=未命中，output=输出。",
+  "prices": [
+    {
+      "provider": "kimi",
+      "model": "kimi-k3",
+      "effectiveFrom": "2026-01-01T00:00:00.000Z",
+      "currency": "CNY",
+      "input": "20.000000000",
+      "output": "100.000000000",
+      "cacheHit": "2.000000000",
+      "sourceUrl": "https://platform.moonshot.cn/docs/pricing/chat",
+      "checkedAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "provider": "kimi",
+      "model": "kimi-k2.7-code",
+      "effectiveFrom": "2026-01-01T00:00:00.000Z",
+      "currency": "CNY",
+      "input": "6.500000000",
+      "output": "27.000000000",
+      "cacheHit": "1.300000000",
+      "sourceUrl": "https://platform.moonshot.cn/docs/pricing/chat",
+      "checkedAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "provider": "kimi",
+      "model": "kimi-k2.7-code-highspeed",
+      "effectiveFrom": "2026-01-01T00:00:00.000Z",
+      "currency": "CNY",
+      "input": "13.000000000",
+      "output": "54.000000000",
+      "cacheHit": "2.600000000",
+      "sourceUrl": "https://platform.moonshot.cn/docs/pricing/chat",
+      "checkedAt": "2026-09-14T00:00:00.000Z"
+    },
+    {
+      "provider": "kimi",
+      "model": "kimi-k2.6",
+      "effectiveFrom": "2026-01-01T00:00:00.000Z",
+      "currency": "CNY",
+      "input": "6.500000000",
+      "output": "27.000000000",
+      "cacheHit": "1.100000000",
+      "sourceUrl": "https://platform.moonshot.cn/docs/pricing/chat",
+      "checkedAt": "2026-09-14T00:00:00.000Z"
+    }
+  ],
+  "volcengine": {
+    "status": "unavailable",
+    "reason": "火山价格页为 JS SPA，api-docs 无法程序化拉取（未证实）；禁止手抄记忆中的数字。请人工录入并填写官网 URL 与日期。",
+    "sourceHint": "https://www.volcengine.com/docs/82379/1099320"
+  }
+}

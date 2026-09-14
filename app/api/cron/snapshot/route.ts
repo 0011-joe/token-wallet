@@ -31,6 +31,7 @@ import { runSnapshots } from "@/lib/snapshot/orchestrator";
 import { toMoney, type Money } from "@/lib/money";
 import { renderAlertEmail } from "@/lib/email/templates";
 import { sendAlertEmail } from "@/lib/email/send";
+import { dispatchBudgetAlerts } from "@/lib/alerts/budget-dispatch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -114,11 +115,27 @@ async function handleCron(request: Request): Promise<NextResponse> {
     },
   });
 
+  // 预算/runway 告警（按用户去重；失败不阻断快照主流程）
+  const userIds = [...new Set(credentials.map((c) => c.userId))];
+  let budgetAlerts = 0;
+  for (const uid of userIds) {
+    try {
+      const r = await dispatchBudgetAlerts(uid);
+      budgetAlerts += r.emitted;
+    } catch (err) {
+      console.warn(
+        `[cron:snapshot] budget alerts skip user=${uid}`,
+        err instanceof Error ? err.message : "unknown"
+      );
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     processed: runResult.processed,
     failed: runResult.failed,
     byProvider: runResult.byProvider,
+    budgetAlerts,
   });
 }
 
