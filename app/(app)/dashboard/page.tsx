@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, KeyRound, RefreshCw } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -14,8 +14,14 @@ import { TrendCard, type RangeValue } from "@/components/dashboard/trend-chart";
 import { BalanceComposition } from "@/components/dashboard/balance-composition";
 import { ModelUsage } from "@/components/dashboard/model-usage";
 import { StaleBanner } from "@/components/dashboard/stale-banner";
-import { fetchCredentials, fetchDashboard, fetchOverview } from "@/lib/api-client";
+import {
+  fetchCredentials,
+  fetchDashboard,
+  fetchOverview,
+  refreshCredential,
+} from "@/lib/api-client";
 import type { DashboardData } from "@/lib/api-types";
+import { STALE_AFTER_MS } from "@/lib/dashboard/overview";
 
 export default function DashboardPage() {
   // useSearchParams 需要 Suspense 边界（Next.js 构建期要求）
@@ -30,6 +36,8 @@ function DashboardContent() {
   const params = useSearchParams();
   const credentialId = params.get("credentialId");
   const [range, setRange] = useState<RangeValue>(30);
+  const queryClient = useQueryClient();
+  const autoRefreshed = useRef(false);
 
   // 凭证列表：未选中时自动选第一个（选中态写入 URL query，刷新不丢）
   const credQuery = useQuery({
@@ -38,6 +46,33 @@ function DashboardContent() {
     retry: 0,
   });
 
+  // 惰性兜底：打开看板时若发现 stale/失败凭证，自动 refresh 一次（每挂载只跑一轮）
+  useEffect(() => {
+    if (autoRefreshed.current) return;
+    const list = credQuery.data?.credentials;
+    if (!list || list.length === 0) return;
+    const now = Date.now();
+    const staleCreds = list.filter((c) => {
+      if (!c.isActive) return false;
+      if (c.lastStatus && c.lastStatus !== "OK") return true;
+      if (!c.lastSuccessAt) return true;
+      return now - new Date(c.lastSuccessAt).getTime() > STALE_AFTER_MS;
+    });
+    if (staleCreds.length === 0) return;
+    autoRefreshed.current = true;
+    // 串行刷新，避免对同一平台打爆限频；失败静默（横幅仍会提示）
+    void (async () => {
+      for (const c of staleCreds) {
+        try {
+          await refreshCredential(c.id);
+        } catch {
+          // 忽略单凭证失败，继续下一把
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: ["credentials"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    })();
+  }, [credQuery.data, queryClient]);
 
   const overviewQuery = useQuery({
     queryKey: ["dashboard", "overview"],
@@ -207,7 +242,10 @@ function Dashboard({
       {/* 第二屏：余额构成（右 1/3）+ 分模型 Token 用量（左 2/3） */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <ModelUsage />
+          <ModelUsage
+            provider={data.credential.provider}
+            credentialId={data.credential.id}
+          />
         </div>
         <BalanceComposition balance={data.balance} />
       </div>

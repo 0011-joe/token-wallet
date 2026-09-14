@@ -194,4 +194,32 @@ describe("POST /api/auth/code/request", () => {
     );
     expect(res.status).toBe(403);
   });
+
+  it("发信失败 → 502（用户可感知，不静默 200）", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    vi.doMock("@/lib/email/otp-mail", () => ({
+      sendOtpEmail: vi.fn().mockResolvedValue({
+        ok: false,
+        channel: "resend",
+        error: "resend 发送失败: boom",
+      }),
+    }));
+    vi.resetModules();
+    const { POST: requestCodeReloaded } = await import(
+      "@/app/api/auth/code/request/route"
+    );
+    const res = await requestCodeReloaded(
+      new Request("http://t/api/auth/code/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "7.7.7.7" },
+        body: JSON.stringify({ email: "fail-send@x.com" }),
+      })
+    );
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("发送失败");
+    expect(body.error).not.toContain("boom");
+    vi.doUnmock("@/lib/email/otp-mail");
+  });
 });

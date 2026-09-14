@@ -1,8 +1,9 @@
 /**
  * 请求邮箱登录验证码（OTP）。
  * POST { email } → 白名单/邀请 Cookie/限流 → 签发 6 位码并发送。
- * 响应恒 { ok: true }（已通过准入时），避免探测邮箱是否存在；
- * console 渠道且非 production 时额外返回 devCode 便于本地联调。
+ * - console 渠道且非 production：响应带 devCode；
+ * - 生产未配置发信：503；
+ * - 发信失败：502（用户可感知，不静默 200）；错误文案不含验证码/连接串。
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -94,13 +95,23 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const issued = await issueLoginCode(email);
-  try {
-    await sendOtpEmail({ to: email.trim().toLowerCase(), code: issued.code });
-  } catch (err) {
-    // 不向客户端泄露发信细节，仅服务端告警
+  const sent = await sendOtpEmail({
+    to: email.trim().toLowerCase(),
+    code: issued.code,
+  });
+  if (!sent.ok) {
+    // 用户必须能感知「邮件没发出」，避免干等一封不存在的邮件
     console.error(
       "[auth:otp] send failed",
-      err instanceof Error ? err.message : "unknown"
+      sent.channel === "unconfigured" ? "unconfigured" : sent.error
+    );
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "验证码邮件发送失败，请稍后重试。若持续失败，请检查 Resend/SMTP 配置或联系管理员。",
+      },
+      { status: 502 }
     );
   }
 

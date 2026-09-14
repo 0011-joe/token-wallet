@@ -43,7 +43,14 @@ const USAGE_PROVIDERS: Array<{ id: ProviderId; label: string }> = [
   { id: "volcengine", label: "豆包" },
 ];
 
-export function ModelUsage({ provider: initialProvider = "deepseek" }: { provider?: ProviderId }) {
+export function ModelUsage({
+  provider: initialProvider = "deepseek",
+  credentialId,
+}: {
+  provider?: ProviderId;
+  /** 限定某把凭证做估算拉取（多 Key 同平台时避免混算） */
+  credentialId?: string | null;
+}) {
   const queryClient = useQueryClient();
   const [provider, setProvider] = useState<ProviderId>(initialProvider);
   const [month, setMonth] = useState(currentMonthUtc());
@@ -138,7 +145,11 @@ export function ModelUsage({ provider: initialProvider = "deepseek" }: { provide
         ) : null}
 
         {query.data && query.data.models.length === 0 ? (
-          <GuideBlock onImported={invalidateModels} provider={provider} />
+          <GuideBlock
+            onImported={invalidateModels}
+            provider={provider}
+            credentialId={credentialId}
+          />
         ) : null}
 
         {query.data && query.data.models.length > 0 ? (
@@ -149,7 +160,11 @@ export function ModelUsage({ provider: initialProvider = "deepseek" }: { provide
                 重新导入同月 CSV 会覆盖更新（不翻倍）；一键拉取与 CSV 共用同月幂等，互相覆盖
                 {isEstimateSource ? "。估算结果请以平台控制台账单为准" : ""}
               </p>
-              <UsagePullButton provider={provider} onPulled={invalidateModels} />
+              <UsagePullButton
+                provider={provider}
+                credentialId={credentialId}
+                onPulled={invalidateModels}
+              />
               <UsageUpload onImported={invalidateModels} provider={provider} />
             </div>
           </div>
@@ -163,9 +178,11 @@ export function ModelUsage({ provider: initialProvider = "deepseek" }: { provide
 function GuideBlock({
   onImported,
   provider,
+  credentialId,
 }: {
   onImported: () => void;
   provider: ProviderId;
+  credentialId?: string | null;
 }) {
   const isDeepseek = provider === "deepseek";
   const platformLabel = provider === "kimi" ? "Kimi" : provider === "volcengine" ? "豆包（火山引擎）" : "DeepSeek";
@@ -206,11 +223,19 @@ function GuideBlock({
             官方未开放模型 Key 用量明细 API，或本仓库未确认字段映射。
             一键拉取会基于余额快照差值给出
             <span className="mx-1 font-medium text-foreground">估算</span>
-            消耗（非官方账单）。需先绑定该平台凭证并完成至少 2 次成功余额快照。
+            消耗（非官方账单）。
+            <br />
+            需先绑定该平台凭证，并完成{" "}
+            <span className="font-medium text-foreground">至少 2 次成功余额快照</span>
+            （可到「凭证管理」点「立即刷新」，或等待每小时定时任务）。
           </p>
         )}
       </div>
-      <UsagePullButton provider={provider} onPulled={onImported} />
+      <UsagePullButton
+        provider={provider}
+        credentialId={credentialId}
+        onPulled={onImported}
+      />
       <UsageUpload onImported={onImported} provider={provider} />
     </div>
   );

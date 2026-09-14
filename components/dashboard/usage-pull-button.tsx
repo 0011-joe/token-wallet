@@ -32,11 +32,14 @@ interface PullResponse {
 
 export function UsagePullButton({
   provider,
+  credentialId,
   onPulled,
   className,
 }: {
   /** 用量归属平台 */
   provider: ProviderId;
+  /** 可选：限定某把凭证的快照做估算（多 Key 同平台时避免混算） */
+  credentialId?: string | null;
   /** 拉取成功（有数据入库）后回调，父组件负责刷新 models 查询 */
   onPulled: () => void;
   className?: string;
@@ -57,7 +60,10 @@ export function UsagePullButton({
       const res = await fetch("/api/usage/pull", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider }),
+        body: JSON.stringify({
+          provider,
+          ...(credentialId ? { credentialId } : {}),
+        }),
       });
       let data: PullResponse = {};
       try {
