@@ -1,16 +1,41 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { CircleAlert, RefreshCw } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PROVIDER_META } from "@/lib/providers/meta";
 import { formatDateTime } from "@/lib/format";
 import { formatMoney } from "@/lib/money";
-import type { DashboardOverview, OverviewCurrency, OverviewPlatform } from "@/lib/api-types";
+import type {
+  CredentialSummary,
+  DashboardOverview,
+  OverviewCurrency,
+  OverviewPlatform,
+  ProviderId,
+} from "@/lib/api-types";
+import { cn } from "@/lib/utils";
 
-/** 跨平台总览（FR-3 / AC3.1-3.3）：分币种合计 + 平台卡 + 健康区。 */
-export function OverviewPanel({ data }: { data: DashboardOverview["overview"] }) {
+import { useRefreshBalances } from "./use-refresh-balances";
+
+/**
+ * 跨平台总览（FR-3 / AC3.1-3.3）：分币种合计 + 平台卡 + 健康区。
+ * 每个余额窗口右上角提供手动刷新（串行拉官方接口后刷新查询）。
+ */
+export function OverviewPanel({
+  data,
+  credentials,
+}: {
+  data: DashboardOverview["overview"];
+  /** 全部凭证（用于按平台/合计筛选刷新目标） */
+  credentials?: CredentialSummary[];
+}) {
+  const activeIds = (credentials ?? [])
+    .filter((c) => c.isActive)
+    .map((c) => c.id);
+
   return (
     <div className="flex flex-col gap-6">
       {/* 分币种合计（不混算、不换算） */}
@@ -18,12 +43,16 @@ export function OverviewPanel({ data }: { data: DashboardOverview["overview"] })
         {data.currencies.length === 0 ? (
           <Card className="sm:col-span-2">
             <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              暂无余额快照。快照任务会按小时拉取一次，或到凭证页手动「立即刷新」。
+              暂无余额快照。快照任务会按小时拉取一次，或点「刷新余额」手动获取。
             </CardContent>
           </Card>
         ) : (
           data.currencies.map((c) => (
-            <CurrencyCard key={c.currency} currency={c} />
+            <CurrencyCard
+              key={c.currency}
+              currency={c}
+              credentialIds={activeIds}
+            />
           ))
         )}
       </div>
@@ -31,20 +60,83 @@ export function OverviewPanel({ data }: { data: DashboardOverview["overview"] })
       {/* 平台卡 */}
       <div className="grid gap-4 lg:grid-cols-3">
         {data.platforms.map((p) => (
-          <PlatformCard key={p.provider} platform={p} />
+          <PlatformCard
+            key={p.provider}
+            platform={p}
+            credentials={credentials}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function CurrencyCard({ currency }: { currency: OverviewCurrency }) {
+function RefreshIconButton({
+  credentialIds,
+  label,
+}: {
+  credentialIds: string[];
+  label: string;
+}) {
+  const { refreshing, refreshBalances } = useRefreshBalances();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <span className="flex items-center gap-1.5">
+      {msg ? (
+        <span role="status" className="max-w-40 truncate text-xs text-destructive">
+          {msg}
+        </span>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs"
+        disabled={refreshing || credentialIds.length === 0}
+        aria-label={label}
+        title={credentialIds.length === 0 ? "无启用凭证" : label}
+        onClick={() => {
+          void (async () => {
+            const r = await refreshBalances(credentialIds);
+            if (r.failed > 0) {
+              setMsg(r.firstError ?? `失败 ${r.failed} 个`);
+            } else if (r.ok > 0) {
+              setMsg(null);
+            }
+          })();
+        }}
+      >
+        <RefreshCw
+          aria-hidden
+          className={cn("size-3.5", refreshing && "animate-spin")}
+        />
+        {refreshing ? "刷新中…" : "刷新余额"}
+      </Button>
+    </span>
+  );
+}
+
+function CurrencyCard({
+  currency,
+  credentialIds,
+}: {
+  currency: OverviewCurrency;
+  credentialIds: string[];
+}) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-sm font-normal text-muted-foreground">
-          可用余额合计
-          <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">{currency.currency}</span>
+          <span className="flex items-center gap-2">
+            可用余额合计
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs">
+              {currency.currency}
+            </span>
+          </span>
+          <RefreshIconButton
+            credentialIds={credentialIds}
+            label="刷新全部余额"
+          />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -62,17 +154,35 @@ function CurrencyCard({ currency }: { currency: OverviewCurrency }) {
   );
 }
 
-function PlatformCard({ platform }: { platform: OverviewPlatform }) {
+function PlatformCard({
+  platform,
+  credentials,
+}: {
+  platform: OverviewPlatform;
+  credentials?: CredentialSummary[];
+}) {
   const meta = PROVIDER_META[platform.provider];
   const hasIssue = platform.failedCount > 0 || platform.staleCount > 0;
+  const platformIds = (credentials ?? [])
+    .filter(
+      (c) => c.isActive && c.provider === (platform.provider as ProviderId)
+    )
+    .map((c) => c.id);
+
   return (
     <Card className={hasIssue ? "border-amber-500/50" : undefined}>
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-sm">
-          <span>{meta?.label ?? platform.provider}</span>
-          <span
-            aria-hidden
-            className={`inline-block size-2 rounded-full ${hasIssue ? "bg-amber-500" : "bg-emerald-500"}`}
+          <span className="flex items-center gap-2">
+            {meta?.label ?? platform.provider}
+            <span
+              aria-hidden
+              className={`inline-block size-2 rounded-full ${hasIssue ? "bg-amber-500" : "bg-emerald-500"}`}
+            />
+          </span>
+          <RefreshIconButton
+            credentialIds={platformIds}
+            label={`刷新${meta?.label ?? platform.provider}余额`}
           />
         </CardTitle>
         <CardDescription>
@@ -104,7 +214,7 @@ function PlatformCard({ platform }: { platform: OverviewPlatform }) {
         {platform.staleCount > 0 ? (
           <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-500">
             <RefreshCw aria-hidden className="size-3.5 shrink-0" />
-            {platform.staleCount} 个凭证数据已陈旧（获取失败 / 数据截至 xx:xx，未显示为 0）
+            {platform.staleCount} 个凭证数据已陈旧（未显示为 0）
           </p>
         ) : null}
         <Link

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, CircleAlert, RefreshCw, Sun, Wallet } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +11,7 @@ import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { EstimateBadge } from "./estimate-badge";
+import { useRefreshBalances } from "./use-refresh-balances";
 
 /**
  * 账户总余额主卡（对齐参考图的 Hero 卡）：
@@ -35,28 +35,16 @@ export function BalanceCard({
   provider?: import("@/lib/api-types").ProviderId;
 }) {
   const unavailable = balance !== null && !balance.isAvailable;
-  const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
-  const queryClient = useQueryClient();
+  const { refreshing, refreshBalances } = useRefreshBalances();
 
   /** 手动触发：实时调官方余额接口 → 写快照 → 刷新看板数据 */
   async function handleRefresh() {
     if (!credentialId || refreshing) return;
-    setRefreshing(true);
     setRefreshError(null);
-    try {
-      const res = await fetch(`/api/keys/${credentialId}/refresh`, { method: "POST" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setRefreshError(body?.error ?? "刷新失败，请稍后重试");
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["keys"] });
-    } catch {
-      setRefreshError("网络错误，请稍后重试");
-    } finally {
-      setRefreshing(false);
+    const r = await refreshBalances([credentialId]);
+    if (r.failed > 0) {
+      setRefreshError(r.firstError ?? "刷新失败，请稍后重试");
     }
   }
 

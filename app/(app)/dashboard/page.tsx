@@ -142,7 +142,10 @@ function DashboardContent() {
                 latestSuccessAt={latestSuccessAt}
                 signature={ov.generatedAt}
               />
-              <OverviewPanel data={ov} />
+              <OverviewPanel
+                data={ov}
+                credentials={credQuery.data?.credentials}
+              />
             </>
           );
         })()
