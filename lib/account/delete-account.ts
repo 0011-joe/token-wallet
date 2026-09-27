@@ -6,7 +6,7 @@
  *   （onDelete: Cascade）；AlertEvent / UsageImport 无 relation，必须手动 deleteMany；
  * - Credential / BalanceSnapshot / AlertSetting / Account / Session 由 onDelete: Cascade
  *   随 User 自动删除；
- * - VerificationToken 无 relation（临时魔法链接令牌，随过期自然失效）。
+ * - VerificationToken 已废弃（OTP 取代魔法链接）；LoginCode 按 email 独立，随过期自然失效。
  * 「注销后不再被定时任务调用」：cron 遍历 isActive Credential，User 删除即其 Credential
  * 行消失，任务自然不会再拉取。
  */

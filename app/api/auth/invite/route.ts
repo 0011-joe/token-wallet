@@ -1,7 +1,7 @@
 /**
  * 邀请码验证（P0）。
  * POST { email, inviteCode } → 校验白名单 + 邀请码，通过后下发短时 HttpOnly Cookie，
- * 供随后的 magic-link sendVerificationRequest 校验。不发登录邮件。
+ * 供随后发验证码（POST /api/auth/code/request）校验准入用。不发登录邮件。
  */
 import { NextResponse } from "next/server";
 import {
