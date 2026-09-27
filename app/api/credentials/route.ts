@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { addCredential, listCredentials } from "@/lib/credentials/service";
 import { credentialsRepo } from "@/lib/credentials/repo";
+import { ensureProviders } from "@/lib/providers/load";
 import { getProviderOrThrow, isProviderRegistered } from "@/lib/providers/registry";
 import type { ProviderId } from "@/lib/providers/types";
 import { writeSnapshots } from "@/lib/snapshot/runner";
@@ -31,6 +32,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
+  try {
+    ensureProviders();
+  } catch (err) {
+    console.error("[credentials] providers load failed", err);
+    return NextResponse.json(
+      { error: "服务端平台适配器加载失败，请稍后重试" },
+      { status: 500 }
+    );
   }
 
   let body: unknown;

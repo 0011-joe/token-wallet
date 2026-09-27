@@ -25,6 +25,7 @@ import {
 } from "@/lib/alerts/evaluate";
 import { listActiveCredentialsWithSecret } from "@/lib/credentials/repo";
 import { getProvider } from "@/lib/providers/registry";
+import { ensureProviders } from "@/lib/providers/load";
 import type { ProviderId } from "@/lib/providers/types";
 import { refreshCredential } from "@/lib/snapshot/runner";
 import { runSnapshots } from "@/lib/snapshot/orchestrator";
@@ -56,6 +57,16 @@ async function handleCron(request: Request): Promise<NextResponse> {
     (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!secretMatches(provided, cronSecret)) {
     return NextResponse.json({ ok: false, error: "鉴权失败：x-cron-secret 不匹配" }, { status: 401 });
+  }
+
+  try {
+    ensureProviders();
+  } catch (err) {
+    console.error("[cron:snapshot] providers load failed", err);
+    return NextResponse.json(
+      { ok: false, error: "provider adapters 未注册" },
+      { status: 500 }
+    );
   }
 
   const credentials = await listActiveCredentialsWithSecret();

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
+import { ensureProviders } from "@/lib/providers/load";
 import { getProvider } from "@/lib/providers/registry";
 import { refreshCredential } from "@/lib/snapshot/runner";
 
@@ -39,9 +40,22 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "该凭证已停用" }, { status: 400 });
   }
 
+  try {
+    ensureProviders();
+  } catch (err) {
+    console.error("[refresh] providers load failed", err);
+    return NextResponse.json(
+      { ok: false, error: "服务端平台适配器加载失败，请稍后重试" },
+      { status: 500 }
+    );
+  }
   const adapter = getProvider(cred.provider);
   if (!adapter) {
-    return NextResponse.json({ ok: false, error: "该平台暂未支持" }, { status: 400 });
+    // 适配器链异常，而非用户平台「不支持」——避免误导文案
+    return NextResponse.json(
+      { ok: false, error: `平台适配器未加载（${cred.provider}），请检查部署` },
+      { status: 500 }
+    );
   }
 
   const result = await refreshCredential(
