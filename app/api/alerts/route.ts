@@ -22,7 +22,7 @@ function severityOf(type: string): "critical" | "warning" {
 }
 
 const DEFAULT_SETTINGS = {
-  lowBalanceThreshold: "20.000000000",
+  lowBalanceThreshold: "10.000000000",
   failThresholdN: DEFAULT_FAIL_THRESHOLD_N,
   emailEnabled: true,
   inappEnabled: true,

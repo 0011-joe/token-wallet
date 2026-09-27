@@ -27,8 +27,8 @@ export type AlertType = (typeof ALERT_TYPES)[number];
 /** 频控窗口：24h（AC5-3）。 */
 export const FREQUENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** 低余额默认阈值（PRD Q3 建议值 20，schema 默认一致）——规范 6 位 Decimal 字符串 */
-export const DEFAULT_LOW_BALANCE_THRESHOLD = "20.000000000";
+/** 低余额默认阈值（2026-09-14 调整为 10，DeepSeek 余额 <10 提醒）——规范 9 位 Decimal 字符串 */
+export const DEFAULT_LOW_BALANCE_THRESHOLD = "10.000000000";
 /** 连续失败默认次数 N（PRD Q3 建议值 3，schema 默认一致）。 */
 export const DEFAULT_FAIL_THRESHOLD_N = 3;
 

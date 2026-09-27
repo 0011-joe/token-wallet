@@ -159,7 +159,7 @@ model ModelUsage {
 
 model AlertSetting {
   userId              String @id
-  lowBalanceThreshold Decimal @default(20) @db.Decimal(18, 9)
+  lowBalanceThreshold Decimal @default(10) @db.Decimal(18, 9)
   failThresholdN      Int    @default(3)
   emailEnabled        Boolean @default(true)
   inappEnabled        Boolean @default(true)

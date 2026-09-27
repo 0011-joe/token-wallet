@@ -20,7 +20,7 @@ const KEY = {
   failCount: 0,
   lastStatus: null as string | null,
 };
-const SETTINGS = { lowBalanceThreshold: "20.000000000", failThresholdN: 3 };
+const SETTINGS = { lowBalanceThreshold: "10.000000000", failThresholdN: 3 };
 
 function hoursAgo(h: number): Date {
   return new Date(Date.now() - h * 3600_000);
@@ -45,7 +45,7 @@ const snap = (available: number | string, isAvailable = true, currency = "CNY") 
 describe("LOW_BALANCE（AC5-1：跌破阈值 → 预警）", () => {
   it("余额 < 阈值 → 生成 LOW_BALANCE（warning / 正确的 dedupKey / 掩码 last4）", () => {
     const results = evaluate({
-      latestSnapshot: snap(19.9),
+      latestSnapshot: snap(9.9),
     });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
@@ -55,7 +55,7 @@ describe("LOW_BALANCE（AC5-1：跌破阈值 → 预警）", () => {
       severity: "warning",
     });
     expect(results[0].message).toContain("****d8d7");
-    expect(results[0].message).toContain("19.900000CNY");
+    expect(results[0].message).toContain("9.900000CNY");
   });
 
   it("余额恰好等于阈值 → 不生成（要求严格小于）", () => {
@@ -204,7 +204,7 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
   it("同类预警 1 小时前 → 不生成（条件仍成立但被抑制）", () => {
     expect(
       evaluate({
-        latestSnapshot: snap(10),
+        latestSnapshot: snap(9),
         lastAlert: { type: "LOW_BALANCE", createdAt: hoursAgo(1) },
       })
     ).toEqual([]);
@@ -212,7 +212,7 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
 
   it("同类预警 25 小时前（窗口已过）→ 恢复生成", () => {
     const results = evaluate({
-      latestSnapshot: snap(10),
+      latestSnapshot: snap(9),
       lastAlert: { type: "LOW_BALANCE", createdAt: hoursAgo(25) },
     });
     expect(results).toHaveLength(1);
@@ -221,7 +221,7 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
 
   it("不同类型的不算频控：近期 CREDENTIAL_FAILED 不抑制 LOW_BALANCE", () => {
     const results = evaluate({
-      latestSnapshot: snap(10),
+      latestSnapshot: snap(9),
       lastAlert: { type: "CREDENTIAL_FAILED", createdAt: hoursAgo(1) },
     });
     expect(results).toHaveLength(1);
@@ -249,16 +249,16 @@ describe("频控（AC5-3：同类同 Key 24h 窗口内不重复）", () => {
 });
 
 describe("导出常量与多类型同时命中", () => {
-  it("频控窗口为 24h；默认阈值 20 / 默认 N=3", () => {
+  it("频控窗口为 24h；默认阈值 10 / 默认 N=3", () => {
     expect(FREQUENCY_WINDOW_MS).toBe(24 * 3600_000);
-    expect(DEFAULT_LOW_BALANCE_THRESHOLD).toBe("20.000000000");
+    expect(DEFAULT_LOW_BALANCE_THRESHOLD).toBe("10.000000000");
     expect(DEFAULT_FAIL_THRESHOLD_N).toBe(3);
     expect(ALERT_TYPES).toEqual(["LOW_BALANCE", "ARREARS", "UNAVAILABLE", "CREDENTIAL_FAILED"]);
   });
 
   it("条件同时命中时一次返回多个候选（三种都应出现）", () => {
     const results: AlertCandidate[] = evaluate({
-      latestSnapshot: snap(10, false),
+      latestSnapshot: snap(9, false),
       prevSnapshot: { isAvailable: true },
       key: { ...KEY, failCount: 4, lastStatus: "RATE_LIMITED" },
     });

@@ -46,7 +46,7 @@ interface AlertEventItem {
 }
 
 const DEFAULT_SETTINGS: AlertSettings = {
-  lowBalanceThreshold: "20.000000000",
+  lowBalanceThreshold: "10.000000000",
   failThresholdN: 3,
   emailEnabled: true,
   inappEnabled: true,
@@ -78,7 +78,7 @@ function formatTime(iso: string): string {
 export default function SettingsPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<AlertSettings>(DEFAULT_SETTINGS);
-  const [thresholdInput, setThresholdInput] = useState("20");
+  const [thresholdInput, setThresholdInput] = useState("10");
   const [failNInput, setFailNInput] = useState("3");
   const [events, setEvents] = useState<AlertEventItem[]>([]);
   const [email, setEmail] = useState<string | null>(null);
