@@ -1,5 +1,14 @@
-﻿/**
- * token-wallet 鏈湴閲囬泦鍣ㄩ鏋讹紙M10 MVP锛屽悓浠撳簱 packages 璇箟锛夈€? * 鍙笂鎶ユ棩鑱氬悎浜旀《 + requests锛涗笉涓婁紶浼氳瘽/prompt銆? * 鐢ㄦ硶锛歯ode packages/collector/collect.js锛堟垨 tsx锛夐厤缃?env 鍚庡畾鏃惰皟鐢?ingest銆? */
+/**
+ * token-wallet 本地采集器（M10 MVP，同仓库 packages 语义）。
+ * 只上报日聚合五桶 + requests；不上传会话/prompt。
+ *
+ * 宿主接法（见 lib/collector/runtime.ts）：
+ *   const rt = createCollectorRuntime({ flush: (d) => pushUsageDays(cfg, d) });
+ *   host.on('session/event', (_, ev) => {
+ *     const s = sampleFromDshEvent(ev, defaultProvider, new Date().toISOString());
+ *     if (s) rt.onUsageSample(s);
+ *   });
+ */
 export interface CollectorDayRow {
   provider: string;
   model: string;
@@ -18,8 +27,16 @@ export interface CollectorConfig {
   tz?: string;
 }
 
-export { foldUsageSamples, createMemoryQueue, localDateKey } from "@/lib/collector/folds";
+export {
+  foldUsageSamples,
+  createMemoryQueue,
+  localDateKey,
+} from "@/lib/collector/folds";
 export type { UsageEventSample, DayAcc } from "@/lib/collector/folds";
+export { sampleFromDshEvent } from "@/lib/collector/dsh-adapter";
+export type { DshAssistantEvent } from "@/lib/collector/dsh-adapter";
+export { createCollectorRuntime, selfCheckHost } from "@/lib/collector/runtime";
+export type { CollectorRuntime, CollectorRuntimeConfig } from "@/lib/collector/runtime";
 
 export async function pushUsageDays(
   config: CollectorConfig,
@@ -46,4 +63,3 @@ export async function pushUsageDays(
   }
   return { ok: res.ok, status: res.status, body };
 }
-
