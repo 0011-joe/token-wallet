@@ -152,7 +152,9 @@ export async function dispatchBudgetAlerts(
           await db.alertEvent.create({
             data: {
               userId,
-              provider: (b.provider as never) ?? "deepseek",
+              // AlertEvent.provider 为枚举：全局预算无 provider 时落 deepseek 占位
+              //（消息文案含预算 id，展示以 message 为准；避免 enum 非空约束写失败）
+              provider: (b.provider as never) || "deepseek",
               credentialId: null,
               type: c.type,
               message,

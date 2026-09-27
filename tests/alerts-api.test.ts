@@ -113,7 +113,7 @@ describeDb("PUT /api/alerts 设置校验与 upsert（AC5：阈值非负 / 渠道
 });
 
 describeDb("GET /api/alerts 设置与事件列表", () => {
-  it("返回设置 + 事件（severity 派生：UNAVAILABLE→critical，其他→warning）", async () => {
+  it("返回设置 + 事件（severity 派生：UNAVAILABLE/ARREARS/BUDGET_BREACH→critical）", async () => {
     mockSession.mockResolvedValueOnce(session(EMAIL));
     await db.alertEvent.create({
       data: {
@@ -135,6 +135,16 @@ describeDb("GET /api/alerts 设置与事件列表", () => {
         dedupKey: "LOW_BALANCE:fake-key-2",
       },
     });
+    await db.alertEvent.create({
+      data: {
+        userId: USER_ID,
+        provider: "deepseek",
+        credentialId: null,
+        type: "BUDGET_BREACH",
+        message: "预算超支 [budget#x]",
+        dedupKey: "BUDGET_BREACH:x",
+      },
+    });
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -148,12 +158,17 @@ describeDb("GET /api/alerts 设置与事件列表", () => {
     };
     expect(body.settings.lowBalanceThreshold).toBe("50.000000000");
     expect(body.settings.inappEnabled).toBe(false);
-    // createdAt desc：LOW_BALANCE（后写的）在前
-    expect(body.events.map((e) => e.type)).toEqual(["LOW_BALANCE", "UNAVAILABLE"]);
+    // createdAt desc
+    expect(body.events.map((e) => e.type)).toEqual([
+      "BUDGET_BREACH",
+      "LOW_BALANCE",
+      "UNAVAILABLE",
+    ]);
     const severities = new Map(
       body.events.map((e) => [e.type, e.severity] as const)
     );
     expect(severities.get("UNAVAILABLE")).toBe("critical");
+    expect(severities.get("BUDGET_BREACH")).toBe("critical");
     expect(severities.get("LOW_BALANCE")).toBe("warning");
     for (const e of body.events) {
       expect(typeof e.createdAt).toBe("string");

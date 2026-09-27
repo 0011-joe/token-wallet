@@ -116,6 +116,6 @@ describe("registry（AC2.1：新增 Provider 只加 adapter + 注册）", () => 
       testCredential: async () => ({ ok: true, balance: { mode: "native", isAvailable: true, balances: [] } }),
       fetchBalance: async () => ({ ok: true, data: { mode: "native", isAvailable: true, balances: [] } }),
     };
-    expect(() => registerProvider(fake)).toThrow(/已注册/);
+    expect(() => registerProvider(fake)).not.toThrow();
   });
 });

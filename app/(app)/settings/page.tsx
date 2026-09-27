@@ -58,6 +58,9 @@ const TYPE_LABELS: Record<string, string> = {
   UNAVAILABLE: "不可用",
   CREDENTIAL_FAILED: "凭证异常",
   KEY_FAILED: "凭证异常", // v1 旧类型兼容展示
+  BUDGET_WARN: "预算预警",
+  BUDGET_BREACH: "预算超支",
+  RUNWAY_SHORT: "余额 runway 偏短",
 };
 
 function formatTime(iso: string): string {

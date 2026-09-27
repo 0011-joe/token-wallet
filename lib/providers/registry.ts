@@ -6,9 +6,8 @@ import type { ProviderAdapter, ProviderId } from "./types";
 const adapters = new Map<ProviderId, ProviderAdapter>();
 
 export function registerProvider(adapter: ProviderAdapter): void {
-  if (adapters.has(adapter.id)) {
-    throw new Error(`Provider ${adapter.id} 已注册（重复注册为编码错误）`);
-  }
+  // 重复注册：同 id 覆盖（Next 热更新会再次执行模块；不必抛错），
+  // 避免 dev 下 HMR 把整个路由打断
   adapters.set(adapter.id, adapter);
 }
 

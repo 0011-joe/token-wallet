@@ -3,7 +3,7 @@
  *
  * GET：当前用户最近 50 条预警事件 + 当前预警设置。
  *   返回 { events: [{id,type,provider,credentialId,message,severity,createdAt}], settings }。
- *   severity 是派生字段（UNAVAILABLE→critical，其他→warning），非数据库字段。
+ *   severity 是派生字段（UNAVAILABLE/ARREARS/BUDGET_BREACH→critical，其他→warning），非数据库字段。
  * PUT：body { lowBalanceThreshold?, failThresholdN?, emailEnabled?, inappEnabled? }。
  *   - lowBalanceThreshold 必须为 >= 0 的数字（阈值不允许为负），否则 400；
  *   - failThresholdN 必须为正整数；两个开关必须为布尔；
@@ -18,7 +18,15 @@ import { toMoney } from "@/lib/money";
 export const dynamic = "force-dynamic";
 
 function severityOf(type: string): "critical" | "warning" {
-  return type === "UNAVAILABLE" ? "critical" : "warning";
+  // 与 lib/alerts/evaluate.ts / budget-evaluate.ts 的 severity 口径对齐
+  if (
+    type === "UNAVAILABLE" ||
+    type === "ARREARS" ||
+    type === "BUDGET_BREACH"
+  ) {
+    return "critical";
+  }
+  return "warning";
 }
 
 const DEFAULT_SETTINGS = {
